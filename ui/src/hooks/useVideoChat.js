@@ -10,6 +10,8 @@ function setVideoBitrate(sdp, bitrate) {
   );
 }
 
+let cachedTurnCredentials = null;
+
 export const useVideoChat = (interests = [], mode = 'video', question = '') => {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -18,6 +20,7 @@ export const useVideoChat = (interests = [], mode = 'video', question = '') => {
   const localStreamRef = useRef(null);
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const connectionTimeoutRef = useRef(null);
   const iceServersRef = useRef([{ urls: 'stun:stun.l.google.com:19302' }]);
   const iceCandidateQueue = useRef([]);
 
@@ -39,11 +42,18 @@ export const useVideoChat = (interests = [], mode = 'video', question = '') => {
    * Fetches TURN servers from our metered.live API to fallback when STUN fails.
    */
   const fetchTurnServers = async () => {
+    if (cachedTurnCredentials) {
+      iceServersRef.current = [{ urls: 'stun:stun.l.google.com:19302' }, ...cachedTurnCredentials];
+      return;
+    }
     try {
       const response = await fetch('/api/turn-credentials');
       if (!response.ok) throw new Error('Failed to fetch TURN credentials');
       const data = await response.json();
-      iceServersRef.current = [{ urls: 'stun:stun.l.google.com:19302' }, ...data];
+      if (Array.isArray(data)) {
+        cachedTurnCredentials = data;
+        iceServersRef.current = [{ urls: 'stun:stun.l.google.com:19302' }, ...data];
+      }
     } catch (err) {
       console.warn("Could not fetch TURN servers, falling back to STUN only:", err);
     }
@@ -53,18 +63,17 @@ export const useVideoChat = (interests = [], mode = 'video', question = '') => {
    * Initializes the video chat by asking for permissions and connecting to signaling.
    */
   const init = async (isMounted) => {
-    await fetchTurnServers();
-    if (!isMounted()) return;
+    const turnPromise = fetchTurnServers();
 
     if (mode === 'video') {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
+        const mediaPromise = navigator.mediaDevices.getUserMedia({
           video: {
             width: { ideal: 1280, max: 1920 },
             height: { ideal: 720, max: 1080 },
             frameRate: { ideal: 30, max: 60 },
             facingMode: 'user',
-            aspectRatio: 16/9
+            aspectRatio: 16 / 9
           },
           audio: {
             echoCancellation: true,
@@ -73,6 +82,9 @@ export const useVideoChat = (interests = [], mode = 'video', question = '') => {
             sampleRate: 48000
           }
         });
+
+        // Parallelize TURN fetching and Camera/Mic access
+        const [_, stream] = await Promise.all([turnPromise, mediaPromise]);
         if (!isMounted()) {
           stream.getTracks().forEach(track => track.stop());
           return;
@@ -87,6 +99,8 @@ export const useVideoChat = (interests = [], mode = 'video', question = '') => {
     } else {
       setIsVideoEnabled(false);
       setIsAudioEnabled(false);
+      await turnPromise;
+      if (!isMounted()) return;
       connectSignaling();
     }
   };
@@ -105,16 +119,29 @@ export const useVideoChat = (interests = [], mode = 'video', question = '') => {
       switch (message.type) {
         case 'waiting': setStatus('waiting'); break;
         case 'matched':
-          setStatus('connected');
-          setToastMessage("🎉 Stranger connected!");
-          setTimeout(() => setToastMessage(""), 2500);
           setCommonInterests(message.commonInterests || []);
           if (message.isSpy || message.isSpyStranger) {
             setSpyState({ isSpy: message.isSpy, isSpyStranger: message.isSpyStranger, question: message.question, peerId: message.peerId });
           }
-          if (!message.isSpy) {
+          if (mode === 'text' || message.isSpy) {
+            setStatus('connected');
+            setToastMessage("🎉 Stranger connected!");
+            setTimeout(() => setToastMessage(""), 2500);
+          } else {
+            // In video mode, transition to 'connecting' while WebRTC completes handshake
+            setStatus('connecting');
             setupPeerConnection(message.initiator);
             socketRef.current.send(JSON.stringify({ type: 'mediaState', videoEnabled: isVideoEnabled, audioEnabled: isAudioEnabled }));
+
+            // 10s Failsafe: if peer is dead or blocked, auto-skip
+            if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+            connectionTimeoutRef.current = setTimeout(() => {
+              if (peerConnectionRef.current && peerConnectionRef.current.connectionState !== 'connected') {
+                setToastMessage("Could not connect to peer — finding another stranger...");
+                findStranger();
+                setTimeout(() => setToastMessage(""), 3000);
+              }
+            }, 10000);
           }
           break;
         case 'offer': await handleOffer(message); break;
@@ -147,34 +174,70 @@ export const useVideoChat = (interests = [], mode = 'video', question = '') => {
     }
     peerConnectionRef.current.ontrack = (event) => {
       if (remoteVideoRef.current) remoteVideoRef.current.srcObject = event.streams[0];
+      if (connectionTimeoutRef.current) {
+        clearTimeout(connectionTimeoutRef.current);
+        connectionTimeoutRef.current = null;
+      }
+      setStatus('connected');
+      setToastMessage("🎉 Stranger connected!");
+      setTimeout(() => setToastMessage(""), 2500);
     };
     peerConnectionRef.current.onicecandidate = (event) => {
-      if (event.candidate) socketRef.current.send(JSON.stringify({ type: 'ice-candidate', candidate: event.candidate }));
+      if (event.candidate && socketRef.current?.readyState === WebSocket.OPEN) {
+        socketRef.current.send(JSON.stringify({ type: 'ice-candidate', candidate: event.candidate }));
+      }
     };
 
     peerConnectionRef.current.onconnectionstatechange = async () => {
-      if (peerConnectionRef.current.connectionState === 'connected') {
-        const sender = peerConnectionRef.current.getSenders().find(s => s.track?.kind === 'video');
-        if (sender) {
-          const params = sender.getParameters();
-          if (!params.encodings) params.encodings = [{}];
-          params.encodings[0].maxBitrate = 2500000;
-          params.encodings[0].maxFramerate = 30;
-          params.encodings[0].networkPriority = 'high';
-          await sender.setParameters(params);
+      const connState = peerConnectionRef.current?.connectionState;
+      if (connState === 'connected') {
+        if (connectionTimeoutRef.current) {
+          clearTimeout(connectionTimeoutRef.current);
+          connectionTimeoutRef.current = null;
         }
+        setStatus('connected');
+        setToastMessage("🎉 Stranger connected!");
+        setTimeout(() => setToastMessage(""), 2500);
+
+        const sender = peerConnectionRef.current?.getSenders().find(s => s.track?.kind === 'video');
+        if (sender) {
+          try {
+            const params = sender.getParameters();
+            if (!params.encodings) params.encodings = [{}];
+            params.encodings[0].maxBitrate = 2500000;
+            params.encodings[0].maxFramerate = 30;
+            params.encodings[0].networkPriority = 'high';
+            await sender.setParameters(params);
+          } catch (e) {
+            console.warn("Could not set sender parameters", e);
+          }
+        }
+      } else if (connState === 'failed') {
+        if (connectionTimeoutRef.current) {
+          clearTimeout(connectionTimeoutRef.current);
+          connectionTimeoutRef.current = null;
+        }
+        setToastMessage("Connection lost — finding a new stranger...");
+        findStranger();
+        setTimeout(() => setToastMessage(""), 3000);
       }
     };
 
     peerConnectionRef.current.oniceconnectionstatechange = () => {
-      const state = peerConnectionRef.current.iceConnectionState;
+      const state = peerConnectionRef.current?.iceConnectionState;
       if (state === 'disconnected') {
         setTimeout(() => {
           if (peerConnectionRef.current && peerConnectionRef.current.iceConnectionState === 'disconnected') {
-            peerConnectionRef.current.restartIce();
+            try {
+              peerConnectionRef.current.restartIce();
+            } catch {}
           }
         }, 3000);
       } else if (state === 'failed') {
+        if (connectionTimeoutRef.current) {
+          clearTimeout(connectionTimeoutRef.current);
+          connectionTimeoutRef.current = null;
+        }
         setToastMessage("Connection lost — finding a new stranger...");
         findStranger();
         setTimeout(() => setToastMessage(""), 3000);
@@ -185,7 +248,9 @@ export const useVideoChat = (interests = [], mode = 'video', question = '') => {
       const offer = await peerConnectionRef.current.createOffer();
       offer.sdp = setVideoBitrate(offer.sdp, 2500);
       await peerConnectionRef.current.setLocalDescription(offer);
-      socketRef.current.send(JSON.stringify({ type: 'offer', offer }));
+      if (socketRef.current?.readyState === WebSocket.OPEN) {
+        socketRef.current.send(JSON.stringify({ type: 'offer', offer }));
+      }
     }
   };
 
@@ -194,11 +259,14 @@ export const useVideoChat = (interests = [], mode = 'video', question = '') => {
    * @param {Object} message - The message containing the offer
    */
   const handleOffer = async (message) => {
+    if (!peerConnectionRef.current) return;
     await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(message.offer));
     const answer = await peerConnectionRef.current.createAnswer();
     answer.sdp = setVideoBitrate(answer.sdp, 2500);
     await peerConnectionRef.current.setLocalDescription(answer);
-    socketRef.current.send(JSON.stringify({ type: 'answer', answer }));
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({ type: 'answer', answer }));
+    }
     processIceQueue();
   };
 
@@ -206,7 +274,9 @@ export const useVideoChat = (interests = [], mode = 'video', question = '') => {
     while (iceCandidateQueue.current.length > 0) {
       const candidate = iceCandidateQueue.current.shift();
       try {
-        await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+        if (peerConnectionRef.current) {
+          await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+        }
       } catch (e) {
         console.error('Error adding queued ice candidate', e);
       }
@@ -218,6 +288,7 @@ export const useVideoChat = (interests = [], mode = 'video', question = '') => {
    * @param {Object} message - The message containing the answer
    */
   const handleAnswer = async (message) => {
+    if (!peerConnectionRef.current) return;
     await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(message.answer));
     processIceQueue();
   };
@@ -242,6 +313,10 @@ export const useVideoChat = (interests = [], mode = 'video', question = '') => {
    * Handles the event when the peer leaves the connection.
    */
   const handlePeerLeft = () => {
+    if (connectionTimeoutRef.current) {
+      clearTimeout(connectionTimeoutRef.current);
+      connectionTimeoutRef.current = null;
+    }
     setStatus('disconnected');
     if (peerConnectionRef.current) { 
       peerConnectionRef.current.close(); 
@@ -253,13 +328,22 @@ export const useVideoChat = (interests = [], mode = 'video', question = '') => {
    * Leaves the current room and joins the waiting queue for a new stranger.
    */
   const findStranger = () => {
+    if (connectionTimeoutRef.current) {
+      clearTimeout(connectionTimeoutRef.current);
+      connectionTimeoutRef.current = null;
+    }
     setStatus('idle'); setMessages([]); setIsStrangerTyping(false); setCommonInterests([]);
     setShowReportModal(false); setSpyState(null); setRemoteVideoEnabled(true); setRemoteAudioEnabled(true);
     iceCandidateQueue.current = [];
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-    if (peerConnectionRef.current) { peerConnectionRef.current.close(); peerConnectionRef.current = null; }
-    socketRef.current.send(JSON.stringify({ type: 'leave' }));
-    setTimeout(() => socketRef.current.send(JSON.stringify({ type: 'join', tags: interests, mode, question })), 100);
+    if (peerConnectionRef.current) { 
+      peerConnectionRef.current.close(); 
+      peerConnectionRef.current = null; 
+    }
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({ type: 'leave' }));
+      socketRef.current.send(JSON.stringify({ type: 'join', tags: interests, mode, question }));
+    }
   };
 
   /**
@@ -360,6 +444,10 @@ export const useVideoChat = (interests = [], mode = 'video', question = '') => {
     
     return () => {
       mounted = false;
+      if (connectionTimeoutRef.current) {
+        clearTimeout(connectionTimeoutRef.current);
+        connectionTimeoutRef.current = null;
+      }
       if (localStreamRef.current) localStreamRef.current.getTracks().forEach(track => track.stop());
       if (peerConnectionRef.current) peerConnectionRef.current.close();
       if (socketRef.current) socketRef.current.close();

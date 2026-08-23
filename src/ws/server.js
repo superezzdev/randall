@@ -44,6 +44,21 @@ export function attachWebSocketServer(server) {
    * @param {Array} commonInterests - Tags they both share
    */
   function pairUp(socket1, socket2, commonInterests) {
+    if (!socket1 || socket1.readyState !== WebSocket.OPEN) {
+      if (socket2 && socket2.readyState === WebSocket.OPEN) {
+        waitingQueue.add({ socket: socket2, tags: socket2.tags || [], mode: socket2.mode || 'video', joinedAt: Date.now() });
+        sendJson(socket2, { type: "waiting" });
+      }
+      return;
+    }
+    if (!socket2 || socket2.readyState !== WebSocket.OPEN) {
+      if (socket1 && socket1.readyState === WebSocket.OPEN) {
+        waitingQueue.add({ socket: socket1, tags: socket1.tags || [], mode: socket1.mode || 'video', joinedAt: Date.now() });
+        sendJson(socket1, { type: "waiting" });
+      }
+      return;
+    }
+
     const room = { sockets: [socket1, socket2], type: 'normal' };
     rooms.set(socket1, room);
     rooms.set(socket2, room);
@@ -61,6 +76,24 @@ export function attachWebSocketServer(server) {
    * @param {Object} stranger2 - The second stranger object
    */
   function pairUpSpy(spyItem, stranger1, stranger2, commonInterests = []) {
+    const sSockets = [spyItem?.socket, stranger1?.socket, stranger2?.socket];
+    const invalid = sSockets.some(s => !s || s.readyState !== WebSocket.OPEN);
+    if (invalid) {
+      if (spyItem?.socket?.readyState === WebSocket.OPEN) {
+        spyQueue.add(spyItem);
+        sendJson(spyItem.socket, { type: "waiting" });
+      }
+      if (stranger1?.socket?.readyState === WebSocket.OPEN) {
+        waitingQueue.add({ socket: stranger1.socket, tags: stranger1.socket.tags || [], mode: 'text', joinedAt: Date.now() });
+        sendJson(stranger1.socket, { type: "waiting" });
+      }
+      if (stranger2?.socket?.readyState === WebSocket.OPEN) {
+        waitingQueue.add({ socket: stranger2.socket, tags: stranger2.socket.tags || [], mode: 'text', joinedAt: Date.now() });
+        sendJson(stranger2.socket, { type: "waiting" });
+      }
+      return;
+    }
+
     const room = { 
       sockets: [spyItem.socket, stranger1.socket, stranger2.socket], 
       type: 'spy', 
@@ -223,15 +256,22 @@ export function attachWebSocketServer(server) {
       if (message.type === "join") {
         if (rooms.has(socket)) return;
         
+        // Purge existing entries for this socket or dead sockets
         for (const w of waitingQueue) {
-          if (w.socket === socket) return;
+          if (w.socket === socket || w.socket.readyState !== WebSocket.OPEN) {
+            waitingQueue.delete(w);
+          }
         }
         for (const s of spyQueue) {
-          if (s.socket === socket) return;
+          if (s.socket === socket || s.socket.readyState !== WebSocket.OPEN) {
+            spyQueue.delete(s);
+          }
         }
 
         const tags = message.tags || [];
         const mode = message.mode || 'video';
+        socket.tags = tags;
+        socket.mode = mode;
 
         if (mode === 'spy') {
           spyQueue.add({ socket, question: message.question, joinedAt: Date.now() });
@@ -242,13 +282,16 @@ export function attachWebSocketServer(server) {
         let match = null;
         let commonInterests = [];
 
-        // Primary Match: Find someone with matching tags AND matching mode
+        // Tier 1: Match with common tags in the same mode
         if (tags.length > 0) {
           const lowerTags = tags.map(t => t.toLowerCase());
           for (const w of waitingQueue) {
-            if (w.socket.readyState !== WebSocket.OPEN) continue;
+            if (w.socket.readyState !== WebSocket.OPEN || w.socket === socket) {
+              if (w.socket.readyState !== WebSocket.OPEN) waitingQueue.delete(w);
+              continue;
+            }
             if (w.mode === mode) {
-              const common = w.tags.filter(t => lowerTags.includes(t.toLowerCase()));
+              const common = (w.tags || []).filter(t => lowerTags.includes(t.toLowerCase()));
               if (common.length > 0) {
                 match = w;
                 commonInterests = common;
@@ -258,14 +301,21 @@ export function attachWebSocketServer(server) {
           }
         }
 
-        // Secondary Match: No tags
-        if (!match && tags.length === 0) {
+        // Tier 2: Instant Match with ANY available waiter of the same mode
+        if (!match) {
           for (const w of waitingQueue) {
-             if (w.socket.readyState !== WebSocket.OPEN) continue;
-             if (w.mode === mode && w.tags.length === 0) {
-               match = w;
-               break;
-             }
+            if (w.socket.readyState !== WebSocket.OPEN || w.socket === socket) {
+              if (w.socket.readyState !== WebSocket.OPEN) waitingQueue.delete(w);
+              continue;
+            }
+            if (w.mode === mode) {
+              match = w;
+              if (tags.length > 0 && w.tags && w.tags.length > 0) {
+                const lowerTags = tags.map(t => t.toLowerCase());
+                commonInterests = w.tags.filter(t => lowerTags.includes(t.toLowerCase()));
+              }
+              break;
+            }
           }
         }
 
@@ -406,15 +456,15 @@ export function attachWebSocketServer(server) {
         continue;
       }
       
-      // Fallback (5 seconds): If someone waited > 5s, pair them with ANYONE available
-      if (now - waiter.joinedAt > 5000 && waitingQueue.has(waiter)) {
+      // If someone has been waiting, pair with any other open waiter of same mode
+      if (waitingQueue.has(waiter)) {
         for (const potentialMatch of waitingQueue) {
           if (potentialMatch !== waiter && potentialMatch.socket.readyState === WebSocket.OPEN && potentialMatch.mode === waiter.mode) {
             waitingQueue.delete(waiter);
             waitingQueue.delete(potentialMatch);
             
-            const lowerTags = waiter.tags.map(t => t.toLowerCase());
-            const commonInterests = potentialMatch.tags.filter(t => lowerTags.includes(t.toLowerCase()));
+            const lowerTags = (waiter.tags || []).map(t => t.toLowerCase());
+            const commonInterests = (potentialMatch.tags || []).filter(t => lowerTags.includes(t.toLowerCase()));
             
             tryPairWithSpy(waiter.socket, potentialMatch.socket, waiter.mode, commonInterests);
             break;
