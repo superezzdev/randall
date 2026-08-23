@@ -52,6 +52,7 @@ const VideoChat = ({ onQuit, interests = [], mode = 'video', question = '' }) =>
 
 
   const isConnected = status === 'connected';
+  const isConnecting = status === 'connecting';
   const isWaiting = status === 'idle' || status === 'searching' || status === 'waiting';
   const isDisconnected = status === 'disconnected';
   const isTextMode = mode === 'text';
@@ -229,13 +230,17 @@ const VideoChat = ({ onQuit, interests = [], mode = 'video', question = '' }) =>
         </div>
       </footer>
 
-      {isWaiting && (
+      {(isWaiting || isConnecting) && (
         <div className="absolute inset-0 bg-[#003cff] flex flex-col items-center justify-center z-[60]">
           <div className="w-20 h-20 bg-[#d8ff00] rounded-full animate-[pulse-g_1.5s_infinite_ease-in-out] flex items-center justify-center shadow-[0_0_0_0_rgba(216,255,0,0.5)]">
             <Search size={32} color="#003cff" strokeWidth={2.5} />
           </div>
-          <div className="text-white font-['Inter',system-ui,sans-serif] text-2xl font-bold mt-8">Looking for a stranger...</div>
-          <div className="text-white/80 text-[15px] font-medium mt-2">Searching for {waitSeconds}s...</div>
+          <div className="text-white font-['Inter',system-ui,sans-serif] text-2xl font-bold mt-8">
+            {isConnecting ? 'Connecting video...' : 'Looking for a stranger...'}
+          </div>
+          <div className="text-white/80 text-[15px] font-medium mt-2">
+            {isConnecting ? 'Establishing secure media connection…' : `Searching for ${waitSeconds}s...`}
+          </div>
           <button onClick={onQuit} className="bg-transparent border border-[#3b82f6] text-white hover:bg-white/5 rounded-full px-8 py-2.5 text-[15px] font-bold mt-10 cursor-pointer transition-all duration-200">Stop Search</button>
         </div>
       )}
