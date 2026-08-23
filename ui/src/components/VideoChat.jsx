@@ -7,10 +7,11 @@ import { useVisualViewport } from '../hooks/useVisualViewport.js';
 const VideoChat = ({ onQuit, interests = [], mode = 'video', question = '' }) => {
   const {
     localVideoRef, remoteVideoRef, messagesEndRef,
-    status, isVideoEnabled, isAudioEnabled, messages, chatInput,
+    status, errorMessage, isVideoEnabled, isAudioEnabled, messages, chatInput,
     isStrangerTyping, commonInterests, userCount, showReportModal, setShowReportModal,
     spyState, remoteVideoEnabled, remoteAudioEnabled, toastMessage,
-    toggleVideo, toggleAudio, handleChatInputChange, sendMessage, submitReport, findStranger
+    toggleVideo, toggleAudio, handleChatInputChange, sendMessage, submitReport, findStranger,
+    retryInit
   } = useVideoChat(interests, mode, question);
 
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -50,11 +51,11 @@ const VideoChat = ({ onQuit, interests = [], mode = 'video', question = '' }) =>
 
   useVisualViewport();
 
-
   const isConnected = status === 'connected';
   const isConnecting = status === 'connecting';
   const isWaiting = status === 'idle' || status === 'searching' || status === 'waiting';
   const isDisconnected = status === 'disconnected';
+  const isError = status === 'error';
   const isTextMode = mode === 'text';
 
   useEffect(() => {
@@ -242,6 +243,27 @@ const VideoChat = ({ onQuit, interests = [], mode = 'video', question = '' }) =>
             {isConnecting ? 'Establishing secure media connection…' : `Searching for ${waitSeconds}s...`}
           </div>
           <button onClick={onQuit} className="bg-transparent border border-[#3b82f6] text-white hover:bg-white/5 rounded-full px-8 py-2.5 text-[15px] font-bold mt-10 cursor-pointer transition-all duration-200">Stop Search</button>
+        </div>
+      )}
+
+      {/* Error Overlay */}
+      {isError && (
+        <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-md flex flex-col items-center justify-center p-6 z-[70] text-center font-['Inter',system-ui,sans-serif]">
+          <div className="w-16 h-16 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center mb-4 text-2xl font-bold">
+            !
+          </div>
+          <h2 className="text-white text-xl font-bold mb-2">Device Permission Error</h2>
+          <p className="text-slate-300 text-sm max-w-sm mb-6 leading-relaxed">
+            {errorMessage || 'Unable to access your camera or microphone. Please check your browser permissions.'}
+          </p>
+          <div className="flex gap-3">
+            <button onClick={retryInit} className="h-11 px-6 rounded-full bg-[#d8ff00] text-[#003cff] font-bold text-sm cursor-pointer hover:bg-[#ccee00] transition-transform hover:scale-105">
+              Try Again
+            </button>
+            <button onClick={onQuit} className="h-11 px-6 rounded-full bg-white/10 text-white font-semibold text-sm border border-white/20 cursor-pointer hover:bg-white/20">
+              Go Home
+            </button>
+          </div>
         </div>
       )}
 

@@ -36,8 +36,8 @@ export const wsArcjet = arcjetKey
         }),
         slidingWindow({
           mode: arcjetMode,
-          interval: "2s",
-          max: 5,
+          interval: "10s",
+          max: 30,
         }),
       ],
     })
