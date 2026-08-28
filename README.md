@@ -1,137 +1,196 @@
-# Randall 🎥
+# Randall 🎥 — Free Random Video Chat App & Omegle Alternative
+
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-randall.superezz.dev-003cff?style=for-the-badge&logo=vercel&logoColor=white)](https://randall.superezz.dev/)
+[![GitHub stars](https://img.shields.io/github/stars/superezzdev/randall?style=for-the-badge&color=ffd700)](https://github.com/superezzdev/randall/stargazers)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![WebRTC](https://img.shields.io/badge/WebRTC-P2P%20Encrypted-333333?style=for-the-badge&logo=webrtc&logoColor=white)](https://webrtc.org/)
+[![React](https://img.shields.io/badge/React-19-61dafb?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
+
+> **Randall** is a free, modern, open-source random video chat application and privacy-first **Omegle alternative**. Connect instantly with strangers worldwide across **1-on-1 video**, **group video calls (up to 5 users)**, and **text chat** — with zero accounts, no history stored, and peer-to-peer WebRTC encryption.
+
+👉 **Try it live:** [https://randall.superezz.dev/](https://randall.superezz.dev/)
+
+---
 
 ![Randall Preview](.github/assets/rendallpreview.png)
 
-A fast, secure, and modern random video chat application where you can meet new people from around the world! Featuring a vibrant design, multiple chat modes, and robust security.
+---
 
-## Features
+## ⚡ Highlights & Features
 
-- **📹 Video + Chat Mode:** Instantly connect face-to-face with a random stranger, complete with text messaging.
-- **💬 Text Only Mode:** Prefer not to be on camera? Connect instantly via text.
-- **👁 Spy Mode:** Ask a question and watch two strangers discuss it live.
-- **Interests Matching:** Enter topics you love to pair up with like-minded people.
-- **Typing Indicator & Online Counter:** Real-time feedback on user activity.
-- **Common Interests Badge:** Highlights the shared interests you have with your partner.
-- **Report & Skip:** Keep the community safe by reporting bad behavior or seamlessly skipping to the next person.
-- **Modern UI:** A stunning, fully responsive aesthetic built with Tailwind CSS and Framer Motion.
-- **Secure Backend:** Protected against malicious payloads and bots using Zod validation and Arcjet.
+- **📹 1-on-1 Random Video Chat:** Instantly connect face-to-face with strangers using ultra-low latency WebRTC peer-to-peer streaming.
+- **👥 Group Video Chat (Up to 5 Users):** Meet multiple strangers in real-time group chat rooms.
+- **💬 Text-Only Chat Mode:** Anonymously connect and chat with random users without using your camera or microphone.
+- **🎯 Interest & Topic Matching:** Enter your favorite interests (e.g. `coding`, `music`, `gaming`, `anime`) to match with like-minded people.
+- **🔒 Privacy First & Zero Registration:** No accounts, emails, passwords, or phone numbers needed. No chat logs or media recorded.
+- **🛡️ Community Safety & Moderation:** Instant skip, user report mechanisms, and automated bot prevention via [Arcjet](https://arcjet.com/) and [Zod](https://zod.dev/).
+- **⚡ Real-Time Presence:** Live online user counter, typing indicators, and instant matchmaking over native WebSockets.
+- **✨ Modern Responsive UI:** Built with React 19, Tailwind CSS, Lucide Icons, and Framer Motion.
 
-## Tech Stack
+---
+
+## 🥊 Why Randall? (Omegle Alternative Comparison)
+
+| Feature | 🚫 Omegle (Defunct) | 👥 Traditional Chat Apps | 🎥 Randall (Open Source) |
+| :--- | :--- | :--- | :--- |
+| **Open Source** | ❌ Proprietary | ❌ Proprietary | ✅ **100% MIT Open Source** |
+| **Group Video Calls** | ❌ No | ⚠️ Requires Accounts | ✅ **Yes (Up to 5 people)** |
+| **No Account Needed** | ✅ Yes | ❌ Requires Sign-up | ✅ **Instant 1-Click Access** |
+| **Peer-to-Peer Encrypted**| ⚠️ Partial | ❌ Relayed Servers | ✅ **WebRTC P2P Direct** |
+| **Bot Protection** | ❌ Poor | ⚠️ Captchas | ✅ **Arcjet Shield & Zod** |
+| **Modern Responsive UI** | ❌ 2000s Web Layout | ⚠️ Heavy Apps | ✅ **Vibrant, Clean & Fast** |
+
+---
+
+## 🛠️ Tech Stack
 
 | Layer | Technology | Purpose |
 | :--- | :--- | :--- |
-| **Frontend** | React + Vite | Builds the user interface you see and interact with on the screen. |
-| **Backend** | Node.js + Express | The core server that handles API requests and serves the application. |
-| **Real-time** | WebSockets (ws) | Maintains a persistent connection to send messages back and forth instantly. |
-| **P2P Video** | WebRTC | Connects your browser directly to another user's browser to stream live video. |
-| **Styling** | Tailwind CSS | Makes the app look beautiful with pre-built design utility classes. |
-| **Security & Validation** | Arcjet & Zod | Protects the app from bad actors, bots, and ensures data integrity. |
+| **Frontend** | React 19 + Vite | Fast, responsive Single Page Application (SPA). |
+| **P2P Video / Audio** | WebRTC (`RTCPeerConnection`) | Direct browser-to-browser media streaming with no server recording. |
+| **Real-time Signaling**| WebSockets (`ws`) | Instant user matching, signaling negotiation, and text messages. |
+| **Backend Server** | Node.js + Express | Lightweight API server and WebSocket broker. |
+| **Styling & UI** | Tailwind CSS + Framer Motion | Modern design with micro-animations. |
+| **Security & Validation**| Arcjet + Zod | Bot detection, rate limiting, and schema validation. |
 
-## How It Works
+---
 
-Video chatting in the browser uses a technology called **WebRTC** (Web Real-Time Communication). Here is a simple plain-English explanation of how two strangers connect:
+## 🔍 How WebRTC Video Chat Works in Randall
 
-1. **Saying Hello to the Server:** When you open the app, your browser connects to our central server using a WebSocket (a continuous, two-way connection).
-2. **Finding a Partner:** You tell the server, "I'm looking for someone to chat with!" The server looks for another person waiting in line (matching interests if provided).
-3. **The Introduction (Signaling):** Because browsers can't easily find each other on the massive internet, the server acts as an introducer. You send a "Hi, this is how you can reach my video feed" message to the server, and the server passes it to your new partner.
-4. **Shaking Hands:** Your partner receives your message and sends one back through the server saying, "Got it, and here is how you can reach *my* video feed!"
-5. **Direct Connection (Peer-to-Peer):** Once both browsers know how to reach each other, they connect directly. The video and audio flow straight from your computer to theirs, completely bypassing our server!
+```
+ [User A (Browser)] <====== WebSockets Signaling (Match & ICE) ======> [User B (Browser)]
+         |                                                                   |
+         +=========== Direct WebRTC P2P Media Stream (Video/Audio) ===========+
+                    (Zero server relay — 100% private and encrypted)
+```
 
-## Getting Started
+1. **Signaling Connection:** When you visit [randall.superezz.dev](https://randall.superezz.dev), your browser connects to the central WebSocket signaling server.
+2. **Matchmaking:** The server pairs you with a waiting user based on your selected mode (1-on-1, Group, or Text) and overlapping interests.
+3. **Offer & Answer (SDP):** The browsers exchange WebRTC session descriptions (SDP offer/answer) and ICE candidates via the WebSocket signaling channel.
+4. **Peer-to-Peer Streaming:** Once handshaking completes, video and audio flow directly between the two browsers. Randall's servers never capture, touch, or store your video frames.
 
-Follow these steps to run the project on your own computer.
+---
+
+## 🚀 Getting Started Locally
 
 ### Prerequisites
-
-Before you begin, make sure you have:
-- **Node.js** (version 18 or higher) installed on your computer.
-- **Git** installed to download the code.
-- A **webcam** (or virtual camera) to test the video features.
+- **Node.js** (v18.0.0 or higher)
+- **Git**
+- A working **webcam and microphone** (for video testing)
 
 ### Installation
 
-First, download the code and navigate into the project folder:
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/superezzdev/randall.git
+   cd randall
+   ```
 
-```bash
-git clone https://github.com/yourusername/randall.git
-cd randall
-```
+2. **Install backend dependencies:**
+   ```bash
+   npm install
+   ```
 
-You need to install the dependencies for both the backend server and the frontend UI:
+3. **Install frontend dependencies:**
+   ```bash
+   cd ui
+   npm install
+   cd ..
+   ```
 
-```bash
-# Install backend dependencies in the root folder
-npm install
-
-# Move into the frontend folder and install its dependencies
-cd ui
-npm install
-cd ..
-```
-
-### Environment Setup
-
-The application uses environment variables (secret settings that shouldn't be shared publicly) to configure things like security and database connections. 
-
-1. Copy the example settings file to create your own:
+4. **Set up Environment Variables:**
    ```bash
    cp .env.example .env
    ```
-2. Open the newly created `.env` file in your code editor and fill in the values:
-   - `PORT`: The port number the backend server will run on (usually `3000`).
-   - `ARCJET_KEY`: Your security key from Arcjet (used to protect the app).
-   - *Any other variables listed in the file.*
+   Open `.env` and configure your port and security keys:
+   ```env
+   PORT=3000
+   ARCJET_KEY=your_arcjet_key_here
+   ```
 
-### Running Locally
+5. **Run the Development Servers:**
 
-To start the app, you will need to run two terminal windows (or tabs) at the same time:
+   **Terminal 1 (Backend):**
+   ```bash
+   npm run dev
+   ```
 
-**Terminal 1: Start the Backend Server**
-```bash
-# Make sure you are in the root 'randall' folder
-npm run dev
-```
+   **Terminal 2 (Frontend UI):**
+   ```bash
+   cd ui
+   npm run dev
+   ```
 
-**Terminal 2: Start the Frontend UI**
-```bash
-# Move into the ui folder
-cd ui
-npm run dev
-```
+6. Open `http://localhost:5173` in two browser windows or on separate devices to test video matching!
 
-### Verify It Works
+---
 
-Open your web browser and go to `http://localhost:5173` (or whatever URL the Vite frontend terminal gives you). 
-You should see the Randall interface! When you click to start chatting in Video mode, your browser will ask for permission to use your camera and microphone.
-
-## Project Structure
-
-Here is a quick map of where everything lives to help you find your way around:
+## 📂 Project Structure
 
 ```text
 randall/
-├── src/                    # Backend server code
-│   ├── index.js            # The main entry point that starts the server
-│   ├── arcjet.js           # Security rules and configurations
-│   ├── routes/             # API endpoints (e.g., /api/users)
-│   └── ws/                 # WebSocket logic (handles matching, Spy mode, chat rooms)
-├── ui/                     # Frontend React application
-│   ├── src/                # All the frontend code
-│   │   ├── components/     # Reusable UI pieces (Home, VideoChat)
-│   │   ├── hooks/          # Custom React logic (useVideoChat, useDraggable)
-│   │   ├── App.jsx         # The main layout of the website
-│   │   └── index.css       # Global styles and Tailwind configuration
-│   ├── index.html          # The blank webpage that loads the React app
-│   └── vite.config.js      # Configuration for the frontend build tool
-├── drizzle/                # Database schemas and migrations
-├── .env.example            # Template for required secret environment variables
-└── package.json            # List of backend dependencies and terminal scripts
+├── src/                    # Backend server & WebSockets
+│   ├── index.js            # Express server entry point
+│   ├── arcjet.js           # Security & bot protection configuration
+│   ├── routes/             # REST endpoints (/api/users, /matches)
+│   └── ws/                 # WebSocket signaling & matchmaking rooms
+├── ui/                     # Frontend React 19 application
+│   ├── public/             # Static assets, robots.txt, sitemap.xml, llms.txt
+│   ├── src/
+│   │   ├── components/     # UI components (Home, VideoChat, Controls)
+│   │   ├── hooks/          # Custom WebRTC and WebSocket hooks (useVideoChat)
+│   │   ├── pages/          # Static pages (About, Safety, Terms, Privacy, Contact)
+│   │   ├── App.jsx         # App shell & routing
+│   │   └── index.css       # Tailwind & theme styles
+│   ├── index.html          # SEO-optimized HTML template & JSON-LD
+│   └── vite.config.js      # Vite build configuration
+├── drizzle/                # Database migrations & schemas
+├── CONTRIBUTING.md         # Contribution guidelines
+└── README.md
 ```
 
-## Contributing
+---
 
-See [CONTRIBUTING.md](CONTRIBUTING.md)
+## ❓ Frequently Asked Questions (FAQ)
 
-## License
+### What is Randall?
+Randall is an open-source, free random video chat web application and modern Omegle alternative. It allows users to meet strangers across the world instantly with no account required.
 
-MIT
+### Is Randall completely free?
+Yes! Randall is 100% free with no subscriptions, premium tiers, or hidden fees.
+
+### Is my video or chat stored?
+No. Randall uses peer-to-peer WebRTC connections. All media streams flow directly between users and are never recorded or stored on any server.
+
+### Can I host my own instance of Randall?
+Yes! Randall is open-source under the MIT license. You can clone the repository, customize the branding, and deploy it to your own server or cloud provider.
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Whether it is fixing bugs, improving the WebRTC signaling engine, or enhancing UI design:
+
+1. Fork the Project (`https://github.com/superezzdev/randall/fork`)
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full details.
+
+---
+
+## 📄 License
+
+Distributed under the **MIT License**. See `LICENSE` for more information.
+
+---
+
+## 👨‍💻 Author
+
+Built with ❤️ by **ARYA RCB** ([@superezzdev](https://github.com/superezzdev))
+- Website: [randall.superezz.dev](https://randall.superezz.dev)
+- GitHub: [@superezzdev](https://github.com/superezzdev)
+

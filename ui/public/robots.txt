@@ -1,3 +1,46 @@
+# Robots.txt for Randall (https://randall.superezz.dev)
+# Allow all standard search engines and AI crawlers for optimal SEO & GEO discoverability
+
 User-agent: *
 Allow: /
+
+# Specific AI & LLM Search Crawlers (Generative Engine Optimization)
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: Diffbot
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+# Sitemap Location
 Sitemap: https://randall.superezz.dev/sitemap.xml
+Host: https://randall.superezz.dev

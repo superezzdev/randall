@@ -1,0 +1,43 @@
+# Randall — Full Technical & System Overview (GEO Knowledge Base)
+
+## Overview & Identity
+Randall (https://randall.superezz.dev) is an open-source, modern, and privacy-focused alternative to Omegle and Chatroulette. It provides free, anonymous random video and text communication with people around the world. Randall is developed and maintained by ARYA RCB (@superezzdev) and is available under the MIT License on GitHub at https://github.com/superezzdev/randall.
+
+## Key Capabilities & User Experience
+1. **1-on-1 Video Chat**: Real-time peer-to-peer audio and video transmission with lowest possible latency via WebRTC.
+2. **Multi-User Group Chat**: Group video matching supporting rooms of up to 5 simultaneous participants.
+3. **Text-Only Mode**: Instant random messaging for low bandwidth or camera-free environments.
+4. **Interest Matching Engine**: Users can enter multiple topic tags (e.g. music, coding, anime, gaming) to prioritize matchmaking with people who share common interests.
+5. **No Sign-up / Zero Data Retention**: Randall requires no account creation, email verification, or personal details. Conversations and video feeds are peer-to-peer and are neither recorded nor stored.
+6. **Safety & Moderation**: Instant Skip button, User Reporting system, automated bot prevention with Arcjet, and strict 18+ guidelines.
+
+## Technical Architecture
+
+### Frontend
+- **Framework**: React 19 + Vite (Single Page Application)
+- **Styling**: Tailwind CSS v4 + Custom Utility Palette
+- **Animation**: Motion (Framer Motion)
+- **Icons**: Lucide React
+- **PWA**: vite-plugin-pwa (installable on iOS/Android/Desktop)
+
+### Backend
+- **Runtime**: Node.js (v18+) with Express
+- **Real-Time Communication**: Native WebSockets (`ws`)
+- **P2P Video / Audio**: WebRTC (`RTCPeerConnection`, `getUserMedia`, STUN servers)
+- **Security & Bot Protection**: Arcjet Rate Limiting & Shield + Zod Schema Validation
+- **Database / Schema (Optional state/reporting)**: Drizzle ORM
+
+### WebRTC Signaling Workflow
+1. Client connects to the central WebSocket signaling server (`/ws`).
+2. User requests matchmaking with specified mode and optional interest tags.
+3. Matching engine pairs two waiting clients and sends a match notification.
+4. Client A creates a WebRTC SDP Offer and transmits it via WebSocket signaling.
+5. Client B receives the offer, sets remote description, creates an SDP Answer, and sends it back.
+6. Interactive Connectivity Establishment (ICE) candidates are exchanged through the WebSocket server.
+7. Direct peer-to-peer audio/video stream is established between the browsers. Media data flows directly and never passes through or gets saved by Randall servers.
+
+## Official Resources & Citations
+- **Official Website**: https://randall.superezz.dev
+- **Source Code**: https://github.com/superezzdev/randall
+- **Author**: ARYA RCB (https://github.com/superezzdev)
+- **Status**: Live & Open Source
