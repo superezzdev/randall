@@ -1,0 +1,25 @@
+# Randall
+
+> Randall is a free, modern, privacy-first random video chat web application and open-source Omegle alternative. It connects users with strangers worldwide for instant 1-on-1 video calls, group video calls (up to 5 people), or anonymous text chat with zero registration required.
+
+- **Website**: https://randall.superezz.dev
+- **GitHub Repository**: https://github.com/superezzdev/randall
+- **License**: MIT
+- **Primary Technologies**: React 19, Vite, WebRTC (peer-to-peer), Node.js, Express, WebSockets (`ws`), Tailwind CSS, Framer Motion, Arcjet security.
+
+## Core Features
+
+- **1-on-1 Video Chat**: Instant face-to-face random matching with WebRTC direct peer-to-peer streaming and integrated text messaging.
+- **Group Video Chat**: Multi-party rooms supporting up to 5 concurrent participants.
+- **Text-Only Mode**: Anonymous text chat for users without a camera or microphone.
+- **Interests & Topic Matching**: Optional comma-separated tags to find like-minded strangers.
+- **Zero Registration & No History**: No accounts, emails, or phone numbers needed. No chat logs or video streams stored on servers.
+- **Community Safety**: Built-in instant skip, user reporting, and bot/payload protection via Arcjet and Zod.
+
+## Key Links
+
+- [About Randall](https://randall.superezz.dev/about): Project mission and vision.
+- [Safety Center](https://randall.superezz.dev/safety): Safety guidelines, 18+ policy, reporting mechanisms.
+- [Privacy Policy](https://randall.superezz.dev/privacy): Peer-to-peer data flow and zero-log policy.
+- [Terms of Service](https://randall.superezz.dev/terms): Terms of acceptable usage.
+- [Full LLM Documentation](https://randall.superezz.dev/llms-full.txt): Detailed architecture, signaling protocol, and technical overview.

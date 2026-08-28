@@ -1,8 +1,18 @@
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Footer } from './Footer';
 import randallLogoText from '../../assets/randall.png';
 
 export const PageLayout = ({ children, title }) => {
+  useEffect(() => {
+    if (title) {
+      document.title = `${title} — Randall`;
+    }
+    return () => {
+      document.title = "Randall — Free Random Video Chat App | Best Omegle Alternative";
+    };
+  }, [title]);
+
   return (
     <div className="min-h-screen bg-[#f4f6f8] flex flex-col font-['Inter',system-ui,sans-serif] antialiased">
       {/* Simple Navbar for pages */}
@@ -34,3 +44,4 @@ export const PageLayout = ({ children, title }) => {
     </div>
   );
 };
+
