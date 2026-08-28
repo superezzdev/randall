@@ -3,7 +3,7 @@ import { useVideoChat } from '../hooks/useVideoChat.js';
 import {
   Mic, MicOff, Video, VideoOff, Monitor, MonitorOff,
   SkipForward, LogOut, Flag, MessageCircle, X, Send, Search,
-  Crown, UserX, Users, ArrowLeftRight, Move, Sparkles
+  Crown, UserX, Users, ArrowLeftRight, Move, Sparkles, SwitchCamera
 } from 'lucide-react';
 import { useVisualViewport } from '../hooks/useVisualViewport.js';
 
@@ -186,6 +186,9 @@ const VideoChat = ({ onQuit, interests = [], mode = 'video' }) => {
     showReportModal,
     setShowReportModal,
     toastMessage,
+    facingMode,
+    isSwitchingCamera,
+    switchCamera,
     toggleVideo,
     toggleAudio,
     startScreenShare,
@@ -451,7 +454,7 @@ const VideoChat = ({ onQuit, interests = [], mode = 'video' }) => {
                     fallbackLabel="You"
                     fallbackSubtext="Your Camera is Off"
                     badgeText="You (Preview)"
-                    mirrored={true}
+                    mirrored={facingMode === 'user' && !isScreenSharing}
                     muted={true}
                   />
                 )
@@ -466,7 +469,7 @@ const VideoChat = ({ onQuit, interests = [], mode = 'video' }) => {
                   fallbackLabel="You"
                   fallbackSubtext="Your Camera is Off"
                   badgeText="You (Large View)"
-                  mirrored={true}
+                  mirrored={facingMode === 'user' && !isScreenSharing}
                   muted={true}
                 />
               )}
@@ -494,7 +497,7 @@ const VideoChat = ({ onQuit, interests = [], mode = 'video' }) => {
                     fallbackLabel="You"
                     fallbackSubtext="Off"
                     badgeText="You"
-                    mirrored={true}
+                    mirrored={facingMode === 'user' && !isScreenSharing}
                     muted={true}
                   />
                 ) : (
@@ -515,14 +518,27 @@ const VideoChat = ({ onQuit, interests = [], mode = 'video' }) => {
 
                 {/* PiP Hover / Action Overlays */}
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-between p-2 pointer-events-none">
-                  {/* Reposition button */}
-                  <button
-                    onClick={cyclePipPosition}
-                    title="Move PiP corner"
-                    className="self-end p-1.5 rounded-full bg-black/70 text-white hover:text-[#d8ff00] pointer-events-auto transition-colors"
-                  >
-                    <Move size={12} />
-                  </button>
+                  {/* Top Action Buttons */}
+                  <div className="w-full flex items-center justify-between pointer-events-auto">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        switchCamera();
+                      }}
+                      title={facingMode === 'user' ? "Switch to rear camera" : "Switch to front camera"}
+                      disabled={!isVideoEnabled || isScreenSharing || isSwitchingCamera}
+                      className="p-1.5 rounded-full bg-black/70 text-white hover:text-[#d8ff00] transition-colors disabled:opacity-40"
+                    >
+                      <SwitchCamera size={12} className={isSwitchingCamera ? 'animate-spin' : ''} />
+                    </button>
+                    <button
+                      onClick={cyclePipPosition}
+                      title="Move PiP corner"
+                      className="p-1.5 rounded-full bg-black/70 text-white hover:text-[#d8ff00] transition-colors"
+                    >
+                      <Move size={12} />
+                    </button>
+                  </div>
 
                   {/* Swap Affordance */}
                   <div className="bg-black/70 backdrop-blur-md text-[#d8ff00] text-[10px] font-black px-2 py-1 rounded-full flex items-center gap-1 border border-white/10 shadow-lg">
@@ -603,7 +619,7 @@ const VideoChat = ({ onQuit, interests = [], mode = 'video' }) => {
                   fallbackSubtext="Camera Off"
                   badgeText="You"
                   isHost={isHost}
-                  mirrored={true}
+                  mirrored={facingMode === 'user' && !isScreenSharing}
                   muted={true}
                 />
               </div>
@@ -758,6 +774,27 @@ const VideoChat = ({ onQuit, interests = [], mode = 'video' }) => {
               }`}
             >
               {!isVideoEnabled ? <VideoOff size={19} /> : <Video size={19} />}
+            </button>
+
+            {/* Switch Camera (Rear <-> Front) */}
+            <button
+              aria-label="Switch Camera"
+              title={
+                !isVideoEnabled
+                  ? "Turn on camera to switch"
+                  : facingMode === 'user'
+                  ? "Switch to Rear Camera"
+                  : "Switch to Front Camera"
+              }
+              onClick={switchCamera}
+              disabled={!isVideoEnabled || isScreenSharing || isSwitchingCamera}
+              className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full border flex items-center justify-center transition-all hover:scale-105 active:scale-95 shadow-md disabled:opacity-40 disabled:hover:scale-100 ${
+                facingMode === 'environment'
+                  ? 'bg-[#003cff] border-[#003cff] text-[#d8ff00] shadow-[0_0_16px_rgba(0,60,255,0.6)]'
+                  : 'bg-white/10 border-white/20 text-white hover:bg-white/20'
+              } ${isSwitchingCamera ? 'animate-spin' : ''}`}
+            >
+              <SwitchCamera size={19} />
             </button>
 
             {/* Flip / Swap Views (1-on-1 mode only) */}

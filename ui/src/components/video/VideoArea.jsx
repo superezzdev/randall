@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Video, VideoOff, Mic, MicOff, SkipForward, LogOut, Flag } from 'lucide-react';
+import { Video, VideoOff, Mic, MicOff, SkipForward, LogOut, Flag, SwitchCamera } from 'lucide-react';
 
 export const VideoArea = ({
   remoteVideoRef, localVideoRef, status, remoteVideoEnabled, isVideoEnabled,
   isAudioEnabled, userCount, commonInterests, toggleVideo, toggleAudio,
+  switchCamera, facingMode = 'user', isSwitchingCamera = false,
   findStranger, onQuit, setShowReportModal, showReportModal, submitReport
 }) => {
   const [showBanner, setShowBanner] = useState(false);
@@ -87,7 +88,7 @@ export const VideoArea = ({
           autoPlay
           playsInline
           muted
-          className="w-full h-full object-cover transform -scale-x-100"
+          className={`w-full h-full object-cover transition-transform ${facingMode === 'user' ? 'transform -scale-x-100' : ''}`}
         />
         {!isVideoEnabled && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
@@ -113,6 +114,19 @@ export const VideoArea = ({
         >
           {isVideoEnabled ? <Video size={20} className="md:w-6 md:h-6" /> : <VideoOff size={20} className="md:w-6 md:h-6" />}
         </button>
+
+        {switchCamera && (
+          <button 
+            onClick={switchCamera}
+            disabled={!isVideoEnabled || isSwitchingCamera}
+            title={facingMode === 'user' ? "Switch to back camera" : "Switch to front camera"}
+            className={`p-3 md:p-4 min-w-[44px] min-h-[44px] rounded-full transition-colors disabled:opacity-40 ${
+              facingMode === 'environment' ? 'bg-[#003cff] text-[#d8ff00]' : 'bg-gray-800 hover:bg-gray-700 text-white'
+            }`}
+          >
+            <SwitchCamera size={20} className={`md:w-6 md:h-6 ${isSwitchingCamera ? 'animate-spin' : ''}`} />
+          </button>
+        )}
 
         <div className="w-px h-6 md:h-8 bg-white/20 mx-1 md:mx-2"></div>
 
