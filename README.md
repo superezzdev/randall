@@ -2,7 +2,7 @@
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-randall.superezz.dev-003cff?style=for-the-badge&logo=vercel&logoColor=white)](https://randall.superezz.dev/)
 [![GitHub stars](https://img.shields.io/github/stars/superezzdev/randall?style=for-the-badge&color=ffd700)](https://github.com/superezzdev/randall/stargazers)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/agpl-3.0)
 [![WebRTC](https://img.shields.io/badge/WebRTC-P2P%20Encrypted-333333?style=for-the-badge&logo=webrtc&logoColor=white)](https://webrtc.org/)
 [![React](https://img.shields.io/badge/React-19-61dafb?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
@@ -184,7 +184,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full details.
 
 ## 📄 License
 
-Distributed under the **MIT License**. See `LICENSE` for more information.
+Distributed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**. See [`LICENSE`](LICENSE) for more information.
+
+> **Note on AGPL-3.0**: Randall is open-source software. Anyone is free to use, modify, contribute, and self-host this project. However, any modified versions or hosted deployments **must also remain open-source under the same AGPL-3.0 license**, ensuring that community improvements remain accessible to everyone and cannot be misappropriated into closed-source proprietary products.
 
 ---
 
@@ -193,4 +195,5 @@ Distributed under the **MIT License**. See `LICENSE` for more information.
 Built with ❤️ by **ARYA RCB** ([@superezzdev](https://github.com/superezzdev))
 - Website: [randall.superezz.dev](https://randall.superezz.dev)
 - GitHub: [@superezzdev](https://github.com/superezzdev)
+
 
