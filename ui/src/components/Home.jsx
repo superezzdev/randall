@@ -206,9 +206,9 @@ export default function Home({ onStart, onlineCount = 0 }) {
           {/* Mode tabs */}
           <div className="flex bg-[#f1f5f9] rounded-xl p-1.5 border border-[#e2e8f0]">
             {[
-              {id:'video',label:'📹 Video + chat'},
+              {id:'video',label:'📹 1-on-1 Video'},
+              {id:'group',label:'👥 Group (5 Max)'},
               {id:'text', label:'💬 Text only'},
-              {id:'spy',  label:'👁 Spy mode'},
             ].map(m=>(
               <button key={m.id} onClick={()=>setMode(m.id)} 
                 className={`flex-1 py-[10px] px-1.5 rounded-lg border-none text-[13px] cursor-pointer font-[inherit] transition-all duration-150 ${mode === m.id ? 'font-bold bg-white text-[#003cff] shadow-sm' : 'font-semibold bg-transparent text-[#64748b] hover:text-[#0f172a]'}`}>
