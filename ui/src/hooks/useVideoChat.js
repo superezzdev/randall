@@ -68,6 +68,19 @@ export const useVideoChat = (interests = [], mode = 'video') => {
     setTimeout(() => setToastMessage(""), duration);
   }, []);
 
+  const getApiBaseUrl = () => {
+    if (import.meta.env.VITE_API_URL) {
+      return import.meta.env.VITE_API_URL.replace(/\/$/, '');
+    }
+    if (import.meta.env.VITE_WS_URL) {
+      return import.meta.env.VITE_WS_URL
+        .replace(/^wss:\/\//i, 'https://')
+        .replace(/^ws:\/\//i, 'http://')
+        .replace(/\/ws\/?$/i, '');
+    }
+    return '';
+  };
+
   /**
    * Fetches TURN servers asynchronously in the background.
    */
@@ -77,8 +90,13 @@ export const useVideoChat = (interests = [], mode = 'video') => {
       return;
     }
     try {
-      const response = await fetch('/api/turn-credentials');
-      if (!response.ok) throw new Error('Failed to fetch TURN credentials');
+      const baseUrl = getApiBaseUrl();
+      const response = await fetch(`${baseUrl}/api/turn-credentials`);
+      if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+      const contentType = response.headers.get('content-type');
+      if (contentType && !contentType.includes('application/json')) {
+        throw new Error('Non-JSON response received');
+      }
       const data = await response.json();
       if (Array.isArray(data) && data.length > 0) {
         cachedTurnCredentials = data;

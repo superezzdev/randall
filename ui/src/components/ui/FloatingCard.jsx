@@ -11,12 +11,19 @@ export const FloatingCard = ({ name, country, flag, seed, rotateClass }) => {
 
   return (
     <div className={`w-[120px] p-[14px] rounded-3xl md:w-[180px] bg-white/20 backdrop-blur-2xl border border-white/30 md:rounded-[32px] md:p-6 flex flex-col items-center shadow-[0_24px_48px_rgba(0,0,0,0.15)] transition-transform duration-500 ease-out cursor-default hover:rotate-0 hover:scale-105 ${rotateClass}`}>
-      <div className="w-[52px] h-[52px] mb-2 md:w-[84px] md:h-[84px] rounded-full bg-[#003cff] overflow-hidden border-[3px] border-white/30 md:mb-3 shrink-0 shadow-inner">
+      <div className="w-[52px] h-[52px] mb-2 md:w-[84px] md:h-[84px] rounded-full bg-[#003cff] overflow-hidden border-[3px] border-white/30 md:mb-3 shrink-0 shadow-inner flex items-center justify-center relative">
         <img 
           src={avatarSrc}
           alt={`${name}'s avatar`}
           width="84"
           height="84"
+          loading="lazy"
+          decoding="async"
+          onError={(e) => {
+            // Fallback to stylized dicebear avatar or initial if asset fails
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(seed)}`;
+          }}
           className="w-full h-full object-cover"
         />
       </div>
