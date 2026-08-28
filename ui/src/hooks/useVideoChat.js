@@ -46,6 +46,7 @@ export const useVideoChat = (interests = [], mode = 'video') => {
 
   const [status, setStatus] = useState('idle'); // 'idle' | 'waiting' | 'connecting' | 'connected' | 'disconnected' | 'error'
   const [errorMessage, setErrorMessage] = useState('');
+  const [localStream, setLocalStream] = useState(null);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
@@ -221,7 +222,9 @@ export const useVideoChat = (interests = [], mode = 'video') => {
         pc.onicecandidate = null;
         pc.onconnectionstatechange = null;
         pc.close();
-      } catch (e) {}
+      } catch {
+        // ignore
+      }
       peerConnectionsRef.current.delete(peerId);
     }
     pendingCandidatesRef.current.delete(peerId);
@@ -251,7 +254,9 @@ export const useVideoChat = (interests = [], mode = 'video') => {
       activeVideoStream.getVideoTracks().forEach(track => {
         try {
           pc.addTrack(track, activeVideoStream);
-        } catch (e) {}
+        } catch {
+          // ignore
+        }
       });
     }
 
@@ -259,7 +264,9 @@ export const useVideoChat = (interests = [], mode = 'video') => {
       localStreamRef.current.getAudioTracks().forEach(track => {
         try {
           pc.addTrack(track, localStreamRef.current);
-        } catch (e) {}
+        } catch {
+          // ignore
+        }
       });
     }
 
@@ -361,7 +368,9 @@ export const useVideoChat = (interests = [], mode = 'video') => {
       for (const candidate of queuedCandidates) {
         try {
           await pc.addIceCandidate(new RTCIceCandidate(candidate));
-        } catch (e) {}
+        } catch {
+          // ignore
+        }
       }
       pendingCandidatesRef.current.delete(senderId);
 
@@ -398,7 +407,9 @@ export const useVideoChat = (interests = [], mode = 'video') => {
       for (const candidate of queuedCandidates) {
         try {
           await pc.addIceCandidate(new RTCIceCandidate(candidate));
-        } catch (e) {}
+        } catch {
+          // ignore
+        }
       }
       pendingCandidatesRef.current.delete(senderId);
     } catch (e) {
@@ -568,8 +579,11 @@ export const useVideoChat = (interests = [], mode = 'video') => {
           return;
         }
         localStreamRef.current = stream;
+        setLocalStream(stream);
         if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
+          if (localVideoRef.current.srcObject !== stream) {
+            localVideoRef.current.srcObject = stream;
+          }
           localVideoRef.current.play().catch(() => {});
         }
 
@@ -614,7 +628,7 @@ export const useVideoChat = (interests = [], mode = 'video') => {
       findStranger();
     };
 
-    socket.onclose = (event) => {
+    socket.onclose = () => {
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       if (!isMounted()) return;
       if (status !== 'idle' && status !== 'disconnected') {
@@ -632,7 +646,7 @@ export const useVideoChat = (interests = [], mode = 'video') => {
       let message;
       try {
         message = JSON.parse(event.data);
-      } catch (e) {
+      } catch {
         return;
       }
 
@@ -947,17 +961,33 @@ export const useVideoChat = (interests = [], mode = 'video') => {
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(t => t.stop());
       }
+      setLocalStream(null);
 
       cleanupAllPeerConnections();
 
       if (socketRef.current) {
-        socketRef.current.close();
+        const sock = socketRef.current;
+        sock.onmessage = null;
+        sock.onerror = null;
+        sock.onclose = null;
+        if (sock.readyState === WebSocket.OPEN) {
+          sock.close();
+        } else if (sock.readyState === WebSocket.CONNECTING) {
+          sock.onopen = () => {
+            try {
+              sock.close();
+            } catch {
+              // ignore
+            }
+          };
+        }
       }
     };
   }, [mode]);
 
   return {
     localVideoRef,
+    localStream,
     messagesEndRef,
     status,
     errorMessage,

@@ -45,8 +45,16 @@ function App() {
         ws.onmessage = null;
         ws.onerror = null;
         ws.onclose = null;
-        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+        if (ws.readyState === WebSocket.OPEN) {
           ws.close();
+        } else if (ws.readyState === WebSocket.CONNECTING) {
+          ws.onopen = () => {
+            try {
+              ws.close();
+            } catch {
+              // ignore
+            }
+          };
         }
       }
     };
