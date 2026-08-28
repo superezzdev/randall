@@ -55,7 +55,7 @@ export default function Home({ onStart, onlineCount = 0 }) {
       <nav className="relative z-20 flex items-center justify-between px-4 sm:px-6 md:px-8 py-4 md:py-5 max-w-[1440px] mx-auto w-full border-b border-white/10">
         {/* Logo */}
         <div className="flex items-center gap-2">
-          <img src={randallLogoText} alt="randall" className="h-[20px] md:h-[24px]" fetchpriority="high" />
+          <img src={randallLogoText} alt="randall" width="95" height="24" className="h-[20px] md:h-[24px] w-auto" fetchPriority="high" />
         </div>
 
         {/* Nav links */}
@@ -73,7 +73,7 @@ export default function Home({ onStart, onlineCount = 0 }) {
 
         {/* Right side pills */}
         <div className="flex items-center gap-2 md:gap-3">
-          <div className="flex items-center gap-[6px] text-white/80 text-[12px] md:text-[13px] font-bold bg-white/10 border border-white/20 rounded-full px-3 py-1.5 md:px-[14px] md:py-[6px] whitespace-nowrap">
+          <div className="flex items-center gap-[6px] text-white text-[12px] md:text-[13px] font-bold bg-white/15 border border-white/25 rounded-full px-3 py-1.5 md:px-[14px] md:py-[6px] whitespace-nowrap">
             <div className="w-[8px] h-[8px] rounded-full bg-[#4ade80] animate-[pulse-g_2s_infinite]"/>
             {onlineCount} online
           </div>
@@ -89,16 +89,19 @@ export default function Home({ onStart, onlineCount = 0 }) {
         <LazyMotion features={domAnimation}>
           <div className="relative w-full max-w-[1000px] flex flex-col items-center">
           
+          {/* Accessible single H1 for screen readers and SEO */}
+          <h1 className="sr-only">Meet Someone New — Free Random Video Chat</h1>
+
           {/* ── STACKED GIANT TYPE ── */}
-          <div className="w-full flex flex-col gap-0 md:gap-2 relative z-50 md:z-10 mt-8 md:mt-0">
+          <div aria-hidden="true" className="w-full flex flex-col gap-0 md:gap-2 relative z-50 md:z-10 mt-8 md:mt-0">
             <m.div 
               initial={{ y: 50, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.6, ease: "easeOut" }}
               className="w-full flex justify-center md:justify-start md:pl-[15%] relative z-[3]">
-              <h1 className={`font-['Inter',system-ui,sans-serif] text-[clamp(3.5rem,11vw,160px)] font-black leading-[0.9] tracking-[-0.04em] text-[#d8ff00] uppercase m-0 p-0 ${typeShadowClass}`}>
+              <span className={`block font-['Inter',system-ui,sans-serif] text-[clamp(3.5rem,11vw,160px)] font-black leading-[0.9] tracking-[-0.04em] text-[#d8ff00] uppercase m-0 p-0 ${typeShadowClass}`}>
                 MEET
-              </h1>
+              </span>
             </m.div>
 
             <m.div 
@@ -106,9 +109,9 @@ export default function Home({ onStart, onlineCount = 0 }) {
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.6, ease: "easeOut", delay: 0.1 }}
               className="w-full flex justify-center md:justify-start md:pl-[clamp(8px,2vw,20px)] relative z-[2]">
-              <h1 className={`font-['Inter',system-ui,sans-serif] text-[clamp(3.8rem,13vw,180px)] font-black leading-[0.9] tracking-[-0.04em] text-white uppercase m-0 p-0 overflow-visible whitespace-nowrap ${typeShadowClass}`}>
+              <span className={`block font-['Inter',system-ui,sans-serif] text-[clamp(3.8rem,13vw,180px)] font-black leading-[0.9] tracking-[-0.04em] text-white uppercase m-0 p-0 overflow-visible whitespace-nowrap ${typeShadowClass}`}>
                 SOMEONE
-              </h1>
+              </span>
             </m.div>
 
             <m.div 
@@ -116,12 +119,12 @@ export default function Home({ onStart, onlineCount = 0 }) {
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.6, ease: "easeOut", delay: 0.2 }}
               className="w-full flex justify-center md:justify-start md:pl-[25%] relative z-[1]">
-              <h1 className={`font-['Inter',system-ui,sans-serif] text-[clamp(3.5rem,11vw,160px)] font-black leading-[0.9] tracking-[-0.04em] text-[#d8ff00] italic uppercase m-0 p-0 ${typeShadowClass}`}>
+              <span className={`block font-['Inter',system-ui,sans-serif] text-[clamp(3.5rem,11vw,160px)] font-black leading-[0.9] tracking-[-0.04em] text-[#d8ff00] italic uppercase m-0 p-0 ${typeShadowClass}`}>
                 NEW
-              </h1>
+              </span>
             </m.div>
             
-            <p className="text-[12px] sm:text-[14px] text-white/50 tracking-[0.08em] uppercase text-center md:text-left md:pl-[15%] mt-6 md:mt-4 font-bold drop-shadow-md">
+            <p className="text-[13px] sm:text-[14px] text-white/90 tracking-[0.08em] uppercase text-center md:text-left md:pl-[15%] mt-6 md:mt-4 font-bold drop-shadow-md">
               One click · A real person · No accounts
             </p>
           </div>
@@ -179,9 +182,9 @@ export default function Home({ onStart, onlineCount = 0 }) {
         <div className="max-w-[560px] mx-auto flex flex-col gap-5">
           
           <div className="text-center">
-            <p className="text-[12px] font-black tracking-[0.1em] text-[#003cff] uppercase mb-3">
+            <h2 className="text-[12px] font-black tracking-[0.1em] text-[#0038e6] uppercase mb-3">
               Your interests (optional)
-            </p>
+            </h2>
             
             {interests.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-2.5 justify-center">
@@ -199,7 +202,7 @@ export default function Home({ onStart, onlineCount = 0 }) {
               onChange={e=>setInputVal(e.target.value)}
               onKeyDown={handleInputKey}
               placeholder="music, gaming, art…"
-              className="w-full bg-[#f4f6f8] border-2 border-[#e2e8f0] rounded-xl px-4 py-4 text-base text-[#0f172a] font-semibold outline-none transition-colors focus:border-[#003cff] focus:bg-white"
+              className="w-full bg-[#f4f6f8] border-2 border-[#cbd5e1] rounded-xl px-4 py-4 text-base text-[#0f172a] font-semibold outline-none transition-colors focus:border-[#003cff] focus:bg-white placeholder:text-[#64748b]"
             />
           </div>
 
@@ -211,7 +214,7 @@ export default function Home({ onStart, onlineCount = 0 }) {
               {id:'text', label:'💬 Text only'},
             ].map(m=>(
               <button key={m.id} onClick={()=>setMode(m.id)} 
-                className={`flex-1 py-[10px] px-1.5 rounded-lg border-none text-[13px] cursor-pointer font-[inherit] transition-all duration-150 ${mode === m.id ? 'font-bold bg-white text-[#003cff] shadow-sm' : 'font-semibold bg-transparent text-[#64748b] hover:text-[#0f172a]'}`}>
+                className={`flex-1 py-[10px] px-1.5 rounded-lg border-none text-[13px] cursor-pointer font-[inherit] transition-all duration-150 ${mode === m.id ? 'font-bold bg-white text-[#003cff] shadow-sm' : 'font-semibold bg-transparent text-[#475569] hover:text-[#0f172a]'}`}>
                 {m.label}
               </button>
             ))}
@@ -231,7 +234,7 @@ export default function Home({ onStart, onlineCount = 0 }) {
           </button>
 
           {/* Rules */}
-          <div className="flex justify-center flex-wrap text-[11px] text-[#9ca3af]">
+          <div className="flex justify-center flex-wrap text-[11px] text-[#4b5563] font-medium">
             {['Be kind','18+ only','No nudity','No harassment'].map((r,i,a)=>(
               <span key={r}>
                 {r}{i<a.length-1 && <span className="mx-1.5 opacity-50">·</span>}

@@ -1,11 +1,11 @@
 import { useState, useEffect, Suspense, lazy } from "react";
 import { Routes, Route } from "react-router-dom";
 import Home from "./components/Home";
-import About from "./pages/About";
-import Privacy from "./pages/Privacy";
-import Terms from "./pages/Terms";
-import Safety from "./pages/Safety";
-import Contact from "./pages/Contact";
+const About = lazy(() => import("./pages/About"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Terms = lazy(() => import("./pages/Terms"));
+const Safety = lazy(() => import("./pages/Safety"));
+const Contact = lazy(() => import("./pages/Contact"));
 const VideoChat = lazy(() => import("./components/VideoChat"));
 
 function App() {
@@ -49,14 +49,16 @@ function App() {
           <VideoChat interests={interests} mode={mode} onQuit={() => setIsChatting(false)} />
         </Suspense>
       ) : (
-        <Routes>
-          <Route path="/" element={<Home onlineCount={onlineCount} onStart={handleStart} />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/privacy" element={<Privacy />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/safety" element={<Safety />} />
-          <Route path="/contact" element={<Contact />} />
-        </Routes>
+        <Suspense fallback={<div className="w-full min-h-screen flex items-center justify-center text-white bg-xblack">Loading...</div>}>
+          <Routes>
+            <Route path="/" element={<Home onlineCount={onlineCount} onStart={handleStart} />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/safety" element={<Safety />} />
+            <Route path="/contact" element={<Contact />} />
+          </Routes>
+        </Suspense>
       )}
     </div>
   );

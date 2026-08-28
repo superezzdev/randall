@@ -8,7 +8,7 @@ export const PageLayout = ({ children, title }) => {
       {/* Simple Navbar for pages */}
       <nav className="bg-[#003cff] relative z-20 flex items-center justify-between px-4 sm:px-6 md:px-8 py-4 md:py-5 w-full">
         <Link to="/" className="flex items-center gap-2">
-          <img src={randallLogoText} alt="randall" className="h-[20px] md:h-[24px]" />
+          <img src={randallLogoText} alt="randall" width="95" height="24" className="h-[20px] md:h-[24px] w-auto" />
         </Link>
         <div className="flex gap-4">
           <Link to="/" className="px-[18px] py-[8px] rounded-full border border-white/30 text-white text-[13px] font-bold no-underline transition-colors hover:bg-white/10 hover:border-white">
