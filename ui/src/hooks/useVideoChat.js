@@ -44,12 +44,20 @@ export const useVideoChat = (interests = [], mode = 'video') => {
   const currentRoomIdRef = useRef(null);
   const currentSocketIdRef = useRef(null);
 
+  const facingModeRef = useRef('user'); // 'user' | 'environment'
+  const isVideoEnabledRef = useRef(true);
+  const isAudioEnabledRef = useRef(true);
+  const isScreenSharingRef = useRef(false);
+
   const [status, setStatus] = useState('idle'); // 'idle' | 'waiting' | 'connecting' | 'connected' | 'disconnected' | 'error'
   const [errorMessage, setErrorMessage] = useState('');
   const [localStream, setLocalStream] = useState(null);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [facingMode, setFacingMode] = useState('user'); // 'user' (front/selfie) | 'environment' (rear/back)
+  const [isSwitchingCamera, setIsSwitchingCamera] = useState(false);
+  const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
   const [isLocalSpeaking, setIsLocalSpeaking] = useState(false);
 
   const [isHost, setIsHost] = useState(false);
@@ -139,7 +147,7 @@ export const useVideoChat = (interests = [], mode = 'video') => {
 
         // Analyze local stream
         const localAnalyser = audioAnalysersRef.current.get('local');
-        if (localAnalyser && isAudioEnabled) {
+        if (localAnalyser && isAudioEnabledRef.current) {
           localAnalyser.getByteFrequencyData(dataArray);
           const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
           setIsLocalSpeaking(avg > 15);
@@ -450,6 +458,7 @@ export const useVideoChat = (interests = [], mode = 'video') => {
       });
 
       screenStreamRef.current = screenStream;
+      isScreenSharingRef.current = true;
       setIsScreenSharing(true);
 
       const screenTrack = screenStream.getVideoTracks()[0];
@@ -495,6 +504,7 @@ export const useVideoChat = (interests = [], mode = 'video') => {
       screenStreamRef.current.getTracks().forEach(t => t.stop());
       screenStreamRef.current = null;
     }
+    isScreenSharingRef.current = false;
     setIsScreenSharing(false);
 
     // Revert video track back to local camera
@@ -556,6 +566,19 @@ export const useVideoChat = (interests = [], mode = 'video') => {
     setErrorMessage('');
     fetchTurnServers().catch(() => {});
 
+    // Check for multiple video cameras on device
+    try {
+      if (navigator.mediaDevices?.enumerateDevices) {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(d => d.kind === 'videoinput');
+        if (isMounted()) {
+          setHasMultipleCameras(videoDevices.length > 1);
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     if (mode === 'video' || mode === 'group') {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -563,7 +586,7 @@ export const useVideoChat = (interests = [], mode = 'video') => {
             width: { ideal: 1280, max: 1920 },
             height: { ideal: 720, max: 1080 },
             frameRate: { ideal: 30, max: 60 },
-            facingMode: 'user',
+            facingMode: facingModeRef.current,
             aspectRatio: 16 / 9
           },
           audio: {
@@ -579,6 +602,8 @@ export const useVideoChat = (interests = [], mode = 'video') => {
           return;
         }
         localStreamRef.current = stream;
+        isVideoEnabledRef.current = true;
+        isAudioEnabledRef.current = true;
         setLocalStream(stream);
         if (localVideoRef.current) {
           if (localVideoRef.current.srcObject !== stream) {
@@ -660,6 +685,9 @@ export const useVideoChat = (interests = [], mode = 'video') => {
           break;
 
         case 'matched':
+          if (message.selfId) {
+            currentSocketIdRef.current = message.selfId;
+          }
           currentRoomIdRef.current = message.roomId || null;
           setCommonInterests(message.commonInterests || []);
           setIsHost(!!message.isHost);
@@ -829,6 +857,7 @@ export const useVideoChat = (interests = [], mode = 'video') => {
       if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
         const newEnabled = videoTrack.enabled;
+        isVideoEnabledRef.current = newEnabled;
         setIsVideoEnabled(newEnabled);
 
         if (socketRef.current?.readyState === WebSocket.OPEN) {
@@ -845,6 +874,117 @@ export const useVideoChat = (interests = [], mode = 'video') => {
   };
 
   /**
+   * Switches active camera between front ('user') and rear ('environment').
+   */
+  const switchCamera = async () => {
+    if (isSwitchingCamera || mode === 'text') return;
+
+    const currentMode = facingModeRef.current;
+    const targetMode = currentMode === 'user' ? 'environment' : 'user';
+    setIsSwitchingCamera(true);
+
+    try {
+      let newStream;
+      const videoConstraints = {
+        width: { ideal: 1280, max: 1920 },
+        height: { ideal: 720, max: 1080 },
+        frameRate: { ideal: 30, max: 60 },
+        aspectRatio: 16 / 9
+      };
+
+      // 1. Try with exact facingMode constraint
+      try {
+        newStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            ...videoConstraints,
+            facingMode: { exact: targetMode }
+          },
+          audio: false
+        });
+      } catch {
+        // Fallback with ideal facingMode constraint
+        try {
+          newStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              ...videoConstraints,
+              facingMode: { ideal: targetMode }
+            },
+            audio: false
+          });
+        } catch {
+          // Broad fallback
+          newStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: targetMode },
+            audio: false
+          });
+        }
+      }
+
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      if (!newVideoTrack) {
+        throw new Error("No video track found on alternate camera");
+      }
+
+      // Preserve current video enabled / muted status
+      newVideoTrack.enabled = isVideoEnabledRef.current;
+
+      const oldVideoTrack = localStreamRef.current?.getVideoTracks()[0];
+
+      // 2. Stop and remove old video track
+      if (oldVideoTrack) {
+        oldVideoTrack.stop();
+        if (localStreamRef.current) {
+          localStreamRef.current.removeTrack(oldVideoTrack);
+        }
+      }
+
+      // 3. Add new video track into existing local media stream
+      if (localStreamRef.current) {
+        localStreamRef.current.addTrack(newVideoTrack);
+      } else {
+        localStreamRef.current = new MediaStream([newVideoTrack]);
+      }
+
+      // 4. Update WebRTC peer connection senders if not actively screen sharing
+      if (!isScreenSharingRef.current) {
+        peerConnectionsRef.current.forEach((pc) => {
+          const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+          if (sender) {
+            sender.replaceTrack(newVideoTrack).catch(e => {
+              console.warn("replaceTrack error during camera switch:", e);
+            });
+          }
+        });
+      }
+
+      // 5. Update facing mode state & reference
+      facingModeRef.current = targetMode;
+      setFacingMode(targetMode);
+
+      // Create new MediaStream reference to trigger React updates
+      const updatedStream = new MediaStream(localStreamRef.current.getTracks());
+      localStreamRef.current = updatedStream;
+      setLocalStream(updatedStream);
+
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = updatedStream;
+        localVideoRef.current.play().catch(() => {});
+      }
+
+      showToast(targetMode === 'environment' ? "📷 Switched to rear camera" : "🤳 Switched to front camera");
+    } catch (err) {
+      console.error("Failed to switch camera:", err);
+      const isNotFound =
+        err.name === 'OverconstrainedError' ||
+        err.name === 'NotFoundError' ||
+        err.name === 'DevicesNotFoundError';
+      showToast(isNotFound ? "No alternate camera found on this device." : "Could not switch camera.");
+    } finally {
+      setIsSwitchingCamera(false);
+    }
+  };
+
+  /**
    * Toggles audio on/off.
    */
   const toggleAudio = () => {
@@ -853,6 +993,7 @@ export const useVideoChat = (interests = [], mode = 'video') => {
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
         const newEnabled = audioTrack.enabled;
+        isAudioEnabledRef.current = newEnabled;
         setIsAudioEnabled(newEnabled);
 
         if (socketRef.current?.readyState === WebSocket.OPEN) {
@@ -1006,6 +1147,10 @@ export const useVideoChat = (interests = [], mode = 'video') => {
     showReportModal,
     setShowReportModal,
     toastMessage,
+    facingMode,
+    isSwitchingCamera,
+    hasMultipleCameras,
+    switchCamera,
     toggleVideo,
     toggleAudio,
     startScreenShare,

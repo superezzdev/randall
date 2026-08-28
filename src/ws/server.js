@@ -181,6 +181,7 @@ export function attachWebSocketServer(server) {
 
     sendJson(socket1, {
       type: "matched",
+      selfId: socket1.id,
       roomId,
       initiator: true,
       mode: room.mode,
@@ -192,6 +193,7 @@ export function attachWebSocketServer(server) {
 
     sendJson(socket2, {
       type: "matched",
+      selfId: socket2.id,
       roomId,
       initiator: false,
       mode: room.mode,
@@ -263,6 +265,7 @@ export function attachWebSocketServer(server) {
       // Notify joining user with current room state and existing peers
       sendJson(socket, {
         type: "matched",
+        selfId: socket.id,
         roomId: targetRoom.id,
         mode: "group",
         initiator: false,
@@ -330,6 +333,7 @@ export function attachWebSocketServer(server) {
       // Host (first waiter who created/waited for the room)
       sendJson(matchWaiter.socket, {
         type: "matched",
+        selfId: matchWaiter.socket.id,
         roomId,
         mode: "group",
         initiator: true,
@@ -342,6 +346,7 @@ export function attachWebSocketServer(server) {
       // Member (newcomer)
       sendJson(socket, {
         type: "matched",
+        selfId: socket.id,
         roomId,
         mode: "group",
         initiator: false,
