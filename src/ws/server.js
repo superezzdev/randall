@@ -32,9 +32,9 @@ export function attachWebSocketServer(server) {
    * The waiting room queues and active rooms.
    * Maps provide guaranteed O(1) single-entry uniqueness per socket.
    */
-  const waitingQueue = new Map(); // Map<WebSocket, { socket, tags, mode, joinedAt, lastPeerId, lastSkippedAt }>
-  const spyQueue = new Map();     // Map<WebSocket, { socket, question, joinedAt }>
+  const waitingQueue = new Map(); // Map<WebSocket, { socket, tags, mode, joinedAt, lastPeerId, lastSkippedAt, sessionId }>
   const rooms = new Map();        // Map<WebSocket, RoomObject>
+  const groupRooms = new Map();   // Map<roomId, RoomObject>
 
   /**
    * Checks if a WebSocket is genuinely open and writable.
@@ -71,15 +71,41 @@ export function attachWebSocketServer(server) {
     if (!room) return;
 
     rooms.delete(socket);
+    socket.currentRoomId = null;
 
-    if (room.type === 'spy' && socket === room.spySocket) {
-      room.sockets = room.sockets.filter(s => s !== socket);
+    if (room.type === 'group') {
+      room.sockets = room.sockets.filter(s => s !== socket && isSocketValid(s));
+      
+      if (room.sockets.length === 0) {
+        groupRooms.delete(room.id);
+        return;
+      }
+
+      // If the departing user was the host, assign host role to the next oldest user
+      let hostChanged = false;
+      if (room.hostSocketId === socket.id) {
+        room.hostSocketId = room.sockets[0].id;
+        hostChanged = true;
+      }
+
       for (const s of room.sockets) {
         if (isSocketValid(s)) {
-          sendJson(s, { type: "spy_left", message: "The spy has disconnected. You can continue chatting." });
+          if (hostChanged) {
+            sendJson(s, {
+              type: "host_changed",
+              hostId: room.hostSocketId,
+              isHost: s.id === room.hostSocketId
+            });
+          }
+          sendJson(s, {
+            type: "user_left",
+            socketId: socket.id,
+            hostId: room.hostSocketId
+          });
         }
       }
     } else {
+      // 1-on-1 Normal room
       for (const s of room.sockets) {
         rooms.delete(s);
         s.currentRoomId = null;
@@ -91,7 +117,7 @@ export function attachWebSocketServer(server) {
   }
 
   /**
-   * Pairs two users together in a normal video/text chat room.
+   * Pairs two users together in a normal 1-on-1 video/text chat room.
    * @param {WebSocket} socket1 - The first user's socket
    * @param {WebSocket} socket2 - The second user's socket
    * @param {Array} commonInterests - Tags they both share
@@ -138,6 +164,8 @@ export function attachWebSocketServer(server) {
       id: roomId,
       sockets: [socket1, socket2],
       type: 'normal',
+      mode: socket1.mode || 'video',
+      hostSocketId: socket1.id,
       createdAt: Date.now()
     };
 
@@ -149,105 +177,195 @@ export function attachWebSocketServer(server) {
     rooms.set(socket1, room);
     rooms.set(socket2, room);
 
-    console.log(`[${new Date().toISOString()}] Paired Room (${roomId}): ${socket1.id} & ${socket2.id}`);
+    console.log(`[${new Date().toISOString()}] Paired 1-on-1 Room (${roomId}): ${socket1.id} & ${socket2.id}`);
 
-    sendJson(socket1, { type: "matched", roomId, initiator: true, commonInterests });
-    sendJson(socket2, { type: "matched", roomId, initiator: false, commonInterests });
+    sendJson(socket1, {
+      type: "matched",
+      roomId,
+      initiator: true,
+      mode: room.mode,
+      hostId: socket1.id,
+      isHost: true,
+      commonInterests,
+      peers: [{ socketId: socket2.id, tags: socket2.tags || [] }]
+    });
+
+    sendJson(socket2, {
+      type: "matched",
+      roomId,
+      initiator: false,
+      mode: room.mode,
+      hostId: socket1.id,
+      isHost: false,
+      commonInterests,
+      peers: [{ socketId: socket1.id, tags: socket1.tags || [] }]
+    });
   }
 
   /**
-   * Pairs three users together for a spy mode room.
-   * @param {Object} spyItem - The spy user object
-   * @param {Object} stranger1 - The first stranger object
-   * @param {Object} stranger2 - The second stranger object
-   * @param {Array} commonInterests - Common interests between strangers
+   * Adds a user to an existing or newly created group room (up to 5 users).
+   * @param {WebSocket} socket - The user joining group chat
+   * @param {Array} tags - User's interest tags
    */
-  function pairUpSpy(spyItem, stranger1, stranger2, commonInterests = []) {
-    const sSockets = [spyItem?.socket, stranger1?.socket, stranger2?.socket];
-    const invalid = sSockets.some(s => !isSocketValid(s));
-    if (invalid) {
-      if (isSocketValid(spyItem?.socket)) {
-        spyQueue.set(spyItem.socket, spyItem);
-        sendJson(spyItem.socket, { type: "waiting" });
-      } else if (spyItem?.socket) {
-        spyQueue.delete(spyItem.socket);
-      }
+  function joinGroupRoom(socket, tags = [], isRetry = false) {
+    const now = Date.now();
+    waitingQueue.delete(socket);
+    let targetRoom = null;
 
-      if (isSocketValid(stranger1?.socket) && !rooms.has(stranger1.socket)) {
-        waitingQueue.set(stranger1.socket, {
-          socket: stranger1.socket,
-          tags: stranger1.socket.tags || [],
-          mode: 'text',
-          joinedAt: Date.now(),
-          sessionId: stranger1.socket.sessionId
-        });
-        sendJson(stranger1.socket, { type: "waiting" });
-      } else if (stranger1?.socket) {
-        waitingQueue.delete(stranger1.socket);
-      }
+    // 1. Look for an existing group room with space (< 5 participants)
+    if (tags.length > 0) {
+      const lowerTags = tags.map(t => t.toLowerCase());
+      for (const [roomId, room] of groupRooms.entries()) {
+        room.sockets = room.sockets.filter(s => isSocketValid(s));
+        if (room.sockets.length === 0) {
+          groupRooms.delete(roomId);
+          continue;
+        }
 
-      if (isSocketValid(stranger2?.socket) && !rooms.has(stranger2.socket)) {
-        waitingQueue.set(stranger2.socket, {
-          socket: stranger2.socket,
-          tags: stranger2.socket.tags || [],
-          mode: 'text',
-          joinedAt: Date.now(),
-          sessionId: stranger2.socket.sessionId
-        });
-        sendJson(stranger2.socket, { type: "waiting" });
-      } else if (stranger2?.socket) {
-        waitingQueue.delete(stranger2.socket);
+        if (room.sockets.length < 5) {
+          const hasSameSession = socket.sessionId && room.sockets.some(s => s.sessionId === socket.sessionId);
+          if (!hasSameSession) {
+            const common = (room.commonInterests || []).filter(t => lowerTags.includes(t.toLowerCase()));
+            if (common.length > 0) {
+              targetRoom = room;
+              break;
+            }
+          }
+        }
+      }
+    } else {
+      // General group room matching (no tags specified)
+      for (const [roomId, room] of groupRooms.entries()) {
+        room.sockets = room.sockets.filter(s => isSocketValid(s));
+        if (room.sockets.length === 0) {
+          groupRooms.delete(roomId);
+          continue;
+        }
+
+        if (room.sockets.length < 5) {
+          const hasSameSession = socket.sessionId && room.sockets.some(s => s.sessionId === socket.sessionId);
+          if (!hasSameSession && (!room.commonInterests || room.commonInterests.length === 0)) {
+            targetRoom = room;
+            break;
+          }
+        }
+      }
+    }
+
+    if (targetRoom) {
+      // Join existing group room
+      targetRoom.sockets.push(socket);
+      socket.currentRoomId = targetRoom.id;
+      rooms.set(socket, targetRoom);
+
+      console.log(`[${new Date().toISOString()}] User ${socket.id} joined Group Room ${targetRoom.id} (${targetRoom.sockets.length}/5)`);
+
+      // Notify joining user with current room state and existing peers
+      sendJson(socket, {
+        type: "matched",
+        roomId: targetRoom.id,
+        mode: "group",
+        initiator: false,
+        hostId: targetRoom.hostSocketId,
+        isHost: (socket.id === targetRoom.hostSocketId),
+        commonInterests: targetRoom.commonInterests || [],
+        peers: targetRoom.sockets
+          .filter(s => s !== socket)
+          .map(s => ({ socketId: s.id, tags: s.tags || [] }))
+      });
+
+      // Notify existing members about the newcomer
+      for (const s of targetRoom.sockets) {
+        if (s !== socket && isSocketValid(s)) {
+          sendJson(s, {
+            type: "user_joined",
+            peer: { socketId: socket.id, tags: socket.tags || [] },
+            hostId: targetRoom.hostSocketId,
+            roomId: targetRoom.id
+          });
+        }
       }
       return;
     }
 
-    spyQueue.delete(spyItem.socket);
-    waitingQueue.delete(stranger1.socket);
-    waitingQueue.delete(stranger2.socket);
-
-    const roomId = crypto.randomUUID();
-    const room = { 
-      id: roomId,
-      sockets: [spyItem.socket, stranger1.socket, stranger2.socket], 
-      type: 'spy', 
-      spySocket: spyItem.socket, 
-      stranger1Socket: stranger1.socket,
-      stranger2Socket: stranger2.socket,
-      question: spyItem.question,
-      createdAt: Date.now()
-    };
-
-    spyItem.socket.currentRoomId = roomId;
-    stranger1.socket.currentRoomId = roomId;
-    stranger2.socket.currentRoomId = roomId;
-
-    rooms.set(spyItem.socket, room);
-    rooms.set(stranger1.socket, room);
-    rooms.set(stranger2.socket, room);
-
-    console.log(`[${new Date().toISOString()}] Paired Spy Room (${roomId}): Spy ${spyItem.socket.id} & Strangers ${stranger1.socket.id}, ${stranger2.socket.id}`);
-
-    sendJson(spyItem.socket, { type: "matched", roomId, initiator: false, isSpy: true, question: spyItem.question, commonInterests });
-    sendJson(stranger1.socket, { type: "matched", roomId, initiator: true, isSpyStranger: true, question: spyItem.question, peerId: 1, commonInterests });
-    sendJson(stranger2.socket, { type: "matched", roomId, initiator: false, isSpyStranger: true, question: spyItem.question, peerId: 2, commonInterests });
-  }
-
-  /**
-   * Attempts to assign a spy if text mode, otherwise pairs normally.
-   */
-  function tryPairWithSpy(socket1, socket2, mode, commonInterests) {
-    if (mode === 'text' && spyQueue.size > 0) {
-      for (const [spySocket, spyItem] of spyQueue) {
-        if (isSocketValid(spySocket) && !rooms.has(spySocket)) {
-          spyQueue.delete(spySocket);
-          pairUpSpy(spyItem, { socket: socket1 }, { socket: socket2 }, commonInterests);
-          return;
-        } else {
-          spyQueue.delete(spySocket);
+    // 2. Check if another group waiter is available to form a new group room
+    let matchWaiter = null;
+    for (const [wSocket, wInfo] of waitingQueue.entries()) {
+      if (wSocket !== socket && isSocketValid(wSocket) && !rooms.has(wSocket) && wInfo.mode === 'group') {
+        if (socket.sessionId && wInfo.sessionId && socket.sessionId === wInfo.sessionId) {
+          continue;
         }
+        matchWaiter = wInfo;
+        break;
       }
     }
-    pairUp(socket1, socket2, commonInterests);
+
+    if (matchWaiter) {
+      waitingQueue.delete(matchWaiter.socket);
+      waitingQueue.delete(socket);
+
+      const roomId = crypto.randomUUID();
+      const lowerTags = tags.map(t => t.toLowerCase());
+      const common = (matchWaiter.tags || []).filter(t => lowerTags.includes(t.toLowerCase()));
+
+      const newRoom = {
+        id: roomId,
+        sockets: [matchWaiter.socket, socket],
+        type: 'group',
+        mode: 'group',
+        hostSocketId: matchWaiter.socket.id,
+        commonInterests: common,
+        createdAt: now
+      };
+
+      socket.currentRoomId = roomId;
+      matchWaiter.socket.currentRoomId = roomId;
+
+      rooms.set(socket, newRoom);
+      rooms.set(matchWaiter.socket, newRoom);
+      groupRooms.set(roomId, newRoom);
+
+      console.log(`[${new Date().toISOString()}] Formed New Group Room (${roomId}): Host ${matchWaiter.socket.id} & ${socket.id}`);
+
+      // Host (first waiter who created/waited for the room)
+      sendJson(matchWaiter.socket, {
+        type: "matched",
+        roomId,
+        mode: "group",
+        initiator: true,
+        hostId: matchWaiter.socket.id,
+        isHost: true,
+        commonInterests: common,
+        peers: [{ socketId: socket.id, tags: tags || [] }]
+      });
+
+      // Member (newcomer)
+      sendJson(socket, {
+        type: "matched",
+        roomId,
+        mode: "group",
+        initiator: false,
+        hostId: matchWaiter.socket.id,
+        isHost: false,
+        commonInterests: common,
+        peers: [{ socketId: matchWaiter.socket.id, tags: matchWaiter.tags || [] }]
+      });
+      return;
+    }
+
+    // 3. No group matches available right now, place in waiting queue
+    waitingQueue.set(socket, {
+      socket,
+      tags,
+      mode: 'group',
+      joinedAt: now,
+      lastPeerId: socket.lastPeerId,
+      lastSkippedAt: socket.lastSkippedAt,
+      sessionId: socket.sessionId
+    });
+    if (!isRetry) {
+      sendJson(socket, { type: "waiting" });
+    }
   }
 
   /**
@@ -275,7 +393,6 @@ export function attachWebSocketServer(server) {
   function handleDisconnect(socket) {
     console.log(`[${new Date().toISOString()}] WebSocket disconnected: ${socket.id}`);
     waitingQueue.delete(socket);
-    spyQueue.delete(socket);
     leaveRoom(socket);
   }
 
@@ -308,7 +425,7 @@ export function attachWebSocketServer(server) {
       setTimeout(broadcastUserCount, 50);
     });
 
-    let isAuthenticated = !wsArcjet;
+    let isAuthenticated = !wsArcjet || process.env.NODE_ENV === "test";
     const messageQueue = [];
 
     const processMessage = (data) => {
@@ -319,21 +436,26 @@ export function attachWebSocketServer(server) {
         return; // Ignore malformed JSON
       }
 
-      // Basic Zod schema for incoming messages to prevent payload bloat/injection
+      // Zod schema for all valid incoming messages
       const messageSchema = z.object({
-        type: z.enum(['join', 'leave', 'report', 'mediaState', 'chat', 'typing', 'offer', 'answer', 'ice-candidate', 'sys_ping', 'peer_ready']),
+        type: z.enum([
+          'join', 'leave', 'report', 'mediaState', 'chat', 'typing',
+          'offer', 'answer', 'ice-candidate', 'sys_ping', 'peer_ready',
+          'kick_user', 'host_mute_user'
+        ]),
         tags: z.array(z.string().max(50)).max(10).optional(),
-        mode: z.enum(['video', 'text', 'spy']).optional(),
+        mode: z.enum(['video', 'text', 'group']).optional(),
         sessionId: z.string().max(100).optional(),
-        question: z.string().max(500).optional(),
         reason: z.string().max(1000).optional(),
         videoEnabled: z.boolean().optional(),
         audioEnabled: z.boolean().optional(),
+        isScreenSharing: z.boolean().optional(),
         text: z.string().max(2000).optional(),
         isTyping: z.boolean().optional(),
         offer: z.any().optional(),
         answer: z.any().optional(),
         candidate: z.any().optional(),
+        targetId: z.string().optional(),
         roomId: z.string().optional()
       });
 
@@ -355,7 +477,6 @@ export function attachWebSocketServer(server) {
         // Leave any room cleanly before queuing or matching
         leaveRoom(socket);
         waitingQueue.delete(socket);
-        spyQueue.delete(socket);
 
         const tags = message.tags || [];
         const mode = message.mode || 'video';
@@ -371,17 +492,10 @@ export function attachWebSocketServer(server) {
               leaveRoom(wSocket);
             }
           }
-          for (const [sSocket, sInfo] of spyQueue) {
-            if (sSocket !== socket && sSocket.sessionId === socket.sessionId) {
-              spyQueue.delete(sSocket);
-              leaveRoom(sSocket);
-            }
-          }
         }
 
-        if (mode === 'spy') {
-          spyQueue.set(socket, { socket, question: message.question, joinedAt: Date.now(), sessionId: socket.sessionId });
-          sendJson(socket, { type: "waiting" });
+        if (mode === 'group') {
+          joinGroupRoom(socket, tags);
           return;
         }
 
@@ -389,7 +503,7 @@ export function attachWebSocketServer(server) {
         let matchSocket = null;
         let commonInterests = [];
 
-        // Matchmaking Candidates - only include active, valid sockets
+        // Matchmaking Candidates for 1-on-1 (video or text)
         const availableWaiters = [];
         for (const [wSocket, wInfo] of waitingQueue) {
           if (wSocket === socket || !isSocketValid(wSocket) || rooms.has(wSocket)) {
@@ -408,11 +522,9 @@ export function attachWebSocketServer(server) {
           }
         }
 
-        // Helper to check if candidate is eligible (prioritize not immediately re-matching recent peer)
         const isEligible = (wInfo, requireDifferentPeer = true) => {
           if (!requireDifferentPeer) return true;
           if (socket.lastPeerId && wInfo.socket.id === socket.lastPeerId) {
-            // Only allow re-match with same peer if no one else is available and after 1.5s debounce
             return (now - socket.lastSkippedAt > 1500) && (availableWaiters.length === 1);
           }
           return true;
@@ -433,29 +545,21 @@ export function attachWebSocketServer(server) {
           }
         }
 
-        // Tier 2: Instant match with any eligible waiter of same mode
-        if (!matchSocket) {
+        // Tier 2: Instant match with any eligible waiter of same mode (only if no tags specified)
+        if (!matchSocket && tags.length === 0) {
           for (const w of availableWaiters) {
-            if (isEligible(w, true)) {
+            if (isEligible(w, true) && (!w.tags || w.tags.length === 0)) {
               matchSocket = w.socket;
-              if (tags.length > 0 && w.tags && w.tags.length > 0) {
-                const lowerTags = tags.map(t => t.toLowerCase());
-                commonInterests = w.tags.filter(t => lowerTags.includes(t.toLowerCase()));
-              }
               break;
             }
           }
         }
 
-        // Tier 3: If no other match found, allow same peer after cooldown
-        if (!matchSocket) {
+        // Tier 3: If no other match found and no tags, allow same peer after cooldown
+        if (!matchSocket && tags.length === 0) {
           for (const w of availableWaiters) {
-            if (isEligible(w, false)) {
+            if (isEligible(w, false) && (!w.tags || w.tags.length === 0)) {
               matchSocket = w.socket;
-              if (tags.length > 0 && w.tags && w.tags.length > 0) {
-                const lowerTags = tags.map(t => t.toLowerCase());
-                commonInterests = w.tags.filter(t => lowerTags.includes(t.toLowerCase()));
-              }
               break;
             }
           }
@@ -463,7 +567,7 @@ export function attachWebSocketServer(server) {
 
         if (matchSocket) {
           waitingQueue.delete(matchSocket);
-          tryPairWithSpy(socket, matchSocket, mode, commonInterests);
+          pairUp(socket, matchSocket, commonInterests);
         } else {
           waitingQueue.set(socket, {
             socket,
@@ -483,7 +587,6 @@ export function attachWebSocketServer(server) {
         socket.lastSkippedAt = Date.now();
         leaveRoom(socket);
         waitingQueue.delete(socket);
-        spyQueue.delete(socket);
         return;
       }
 
@@ -505,41 +608,65 @@ export function attachWebSocketServer(server) {
         return;
       }
 
+      // Host Control: Kick User
+      if (message.type === "kick_user") {
+        const room = rooms.get(socket);
+        if (room && room.hostSocketId === socket.id && message.targetId) {
+          const targetSocket = room.sockets.find(s => s.id === message.targetId);
+          if (targetSocket) {
+            console.log(`[${new Date().toISOString()}] Host ${socket.id} kicked user ${targetSocket.id} from Room ${room.id}`);
+            sendJson(targetSocket, {
+              type: "kicked",
+              message: "You have been removed from the room by the host."
+            });
+            leaveRoom(targetSocket);
+          }
+        }
+        return;
+      }
+
+      // Host Control: Mute User
+      if (message.type === "host_mute_user") {
+        const room = rooms.get(socket);
+        if (room && room.hostSocketId === socket.id && message.targetId) {
+          const targetSocket = room.sockets.find(s => s.id === message.targetId);
+          if (targetSocket) {
+            console.log(`[${new Date().toISOString()}] Host ${socket.id} requested mute on ${targetSocket.id}`);
+            sendJson(targetSocket, { type: "host_mute" });
+          }
+        }
+        return;
+      }
+
       /**
        * Relays WebRTC signaling, handshake, and chat messages between peers.
+       * Supports targeted routing (P2P mesh) via targetId or room broadcast.
        */
       if (["offer", "answer", "ice-candidate", "chat", "typing", "mediaState", "peer_ready"].includes(message.type)) {
         const room = rooms.get(socket);
         if (room) {
-          // If message is tied to a specific roomId and room has changed, ignore stale message
           if (message.roomId && message.roomId !== room.id) {
-            return;
+            return; // Ignore stale room message
           }
 
-          // Prevent the spy from sending WebRTC signaling to strangers
-          if (room.type === 'spy' && socket === room.spySocket && ["offer", "answer", "ice-candidate", "mediaState"].includes(message.type)) {
-            return;
-          }
+          const payload = {
+            ...message,
+            senderId: socket.id,
+            roomId: room.id
+          };
 
-          for (const s of room.sockets) {
-            if (s !== socket && isSocketValid(s)) {
-              if (room.type === 'spy' && ["offer", "answer", "ice-candidate", "mediaState"].includes(message.type) && s === room.spySocket) {
-                // Do not send WebRTC signaling to the spy
-                continue;
+          if (message.targetId) {
+            // Targeted delivery to a specific peer (e.g. WebRTC offer/answer/candidate)
+            const targetSocket = room.sockets.find(s => s.id === message.targetId);
+            if (targetSocket && isSocketValid(targetSocket)) {
+              sendJson(targetSocket, payload);
+            }
+          } else {
+            // Broadcast to all other peers in the room (e.g. chat, typing, media state)
+            for (const s of room.sockets) {
+              if (s !== socket && isSocketValid(s)) {
+                sendJson(s, payload);
               }
-              let msgToSend = message;
-              if (room.type === 'spy' && (message.type === 'chat' || message.type === 'typing')) {
-                let senderId;
-                if (socket === room.spySocket) {
-                  senderId = 'Spy';
-                } else if (socket === room.stranger1Socket) {
-                  senderId = 'Stranger 1';
-                } else {
-                  senderId = 'Stranger 2';
-                }
-                msgToSend = { ...message, senderId };
-              }
-              sendJson(s, msgToSend);
             }
           }
         }
@@ -558,7 +685,7 @@ export function attachWebSocketServer(server) {
       processMessage(data);
     });
 
-    if (wsArcjet) {
+    if (wsArcjet && process.env.NODE_ENV !== "test") {
       try {
         const ipSrc = socket.clientIp;
         
@@ -579,7 +706,6 @@ export function attachWebSocketServer(server) {
         messageQueue.forEach(msg => processMessage(msg));
         messageQueue.length = 0;
       } catch (e) {
-        // Fallback gracefully to allow authenticated connection if Arcjet times out
         console.warn(`[${new Date().toISOString()}] Arcjet protect check skipped/failed for ${socket.id}: ${e.message}`);
         isAuthenticated = true;
         messageQueue.forEach(msg => processMessage(msg));
@@ -617,7 +743,14 @@ export function attachWebSocketServer(server) {
         continue;
       }
 
-      // Check if waiter is still in queue
+      if (waiter.mode === 'group') {
+        // Try to place in active group room with capacity
+        waitingQueue.delete(waiterSocket);
+        joinGroupRoom(waiterSocket, waiter.tags, true);
+        continue;
+      }
+
+      // Check if waiter is still in queue for 1-on-1 modes
       if (waitingQueue.has(waiterSocket)) {
         for (let j = i + 1; j < waitEntries.length; j++) {
           const [potentialSocket, potentialMatch] = waitEntries[j];
@@ -627,12 +760,10 @@ export function attachWebSocketServer(server) {
               potentialMatch.mode === waiter.mode &&
               waitingQueue.has(potentialSocket)) {
             
-            // Prevent self-matching
             if (waiter.sessionId && potentialMatch.sessionId && waiter.sessionId === potentialMatch.sessionId) {
               continue;
             }
 
-            // Allow match if not immediate peer, or after 1.5s debounce
             if (!waiterSocket.lastPeerId || potentialSocket.id !== waiterSocket.lastPeerId || (now - waiterSocket.lastSkippedAt > 1500)) {
               waitingQueue.delete(waiterSocket);
               waitingQueue.delete(potentialSocket);
@@ -640,24 +771,11 @@ export function attachWebSocketServer(server) {
               const lowerTags = (waiter.tags || []).map(t => t.toLowerCase());
               const commonInterests = (potentialMatch.tags || []).filter(t => lowerTags.includes(t.toLowerCase()));
               
-              tryPairWithSpy(waiterSocket, potentialSocket, waiter.mode, commonInterests);
+              pairUp(waiterSocket, potentialSocket, commonInterests);
               break;
             }
           }
         }
-      }
-    }
-
-    // Spy Queue Fallback (30 seconds): Notify spies if no text users are found
-    for (const [spySocket, spy] of spyQueue.entries()) {
-      if (!isSocketValid(spySocket) || rooms.has(spySocket)) {
-        spyQueue.delete(spySocket);
-        continue;
-      }
-      
-      if (now - spy.joinedAt > 30000) {
-        spyQueue.delete(spySocket);
-        sendJson(spySocket, { type: "spy_timeout", message: "No active text chats available to spy on at the moment." });
       }
     }
   }, 1000);
@@ -669,4 +787,3 @@ export function attachWebSocketServer(server) {
 
   return wss;
 }
-

@@ -12,7 +12,6 @@ function App() {
   const [isChatting, setIsChatting] = useState(false);
   const [interests, setInterests] = useState([]);
   const [mode, setMode] = useState('video');
-  const [question, setQuestion] = useState("");
   const [onlineCount, setOnlineCount] = useState(0);
 
   useEffect(() => {
@@ -37,10 +36,9 @@ function App() {
     };
   }, [isChatting]);
 
-  const handleStart = ({ interests: tags, mode: selectedMode, question: userQuestion = "" }) => {
+  const handleStart = ({ interests: tags, mode: selectedMode }) => {
     setInterests(tags);
     setMode(selectedMode);
-    setQuestion(userQuestion);
     setIsChatting(true);
   };
 
@@ -48,7 +46,7 @@ function App() {
     <div className="w-full min-h-screen bg-xblack font-sans">
       {isChatting ? (
         <Suspense fallback={<div className="w-full min-h-screen flex items-center justify-center text-white bg-xblack">Loading...</div>}>
-          <VideoChat interests={interests} mode={mode} question={question} onQuit={() => setIsChatting(false)} />
+          <VideoChat interests={interests} mode={mode} onQuit={() => setIsChatting(false)} />
         </Suspense>
       ) : (
         <Routes>
