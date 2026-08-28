@@ -265,8 +265,18 @@ export const useVideoChat = (interests = [], mode = 'video') => {
 
     // Handle incoming remote media tracks
     pc.ontrack = (event) => {
-      const incomingStream = event.streams[0] || new MediaStream([event.track]);
-      remoteStreamsRef.current.set(peerId, incomingStream);
+      let incomingStream = event.streams && event.streams[0];
+      if (!incomingStream) {
+        let existingStream = remoteStreamsRef.current.get(peerId);
+        if (!existingStream) {
+          existingStream = new MediaStream();
+          remoteStreamsRef.current.set(peerId, existingStream);
+        }
+        existingStream.addTrack(event.track);
+        incomingStream = existingStream;
+      } else {
+        remoteStreamsRef.current.set(peerId, incomingStream);
+      }
       attachAudioAnalyser(peerId, incomingStream);
 
       setPeers(prev => {
@@ -296,6 +306,13 @@ export const useVideoChat = (interests = [], mode = 'video') => {
           candidate: event.candidate,
           roomId: currentRoomIdRef.current
         }));
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      const iceState = pc.iceConnectionState;
+      if (iceState === 'connected' || iceState === 'completed') {
+        setStatus('connected');
       }
     };
 
@@ -653,8 +670,15 @@ export const useVideoChat = (interests = [], mode = 'video') => {
               }));
             }
 
-            // In group mode, if this user is a newcomer who joined an existing room with peers,
-            // existing peers will receive `user_joined` and initiate offers to this newcomer.
+            // In 1-on-1 mode or newly formed group rooms, the initiator creates peer connection(s) and sends WebRTC Offer(s)
+            const shouldInitiateOffers = message.initiator ?? (mode !== 'group' && message.isHost);
+            if (shouldInitiateOffers && Array.isArray(message.peers)) {
+              for (const peer of message.peers) {
+                if (peer.socketId) {
+                  createPeerConnection(peer.socketId, true);
+                }
+              }
+            }
           }
           break;
 
