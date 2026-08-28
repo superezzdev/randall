@@ -15,8 +15,8 @@
     "demo": "node src/crud-demo.js"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "ARYA RCB (https://github.com/superezzdev)",
+  "license": "AGPL-3.0",
   "type": "module",
   "dependencies": {
     "@arcjet/inspect": "^1.10.0",

@@ -1,7 +1,7 @@
 # Randall — Full Technical & System Overview (GEO Knowledge Base)
 
 ## Overview & Identity
-Randall (https://randall.superezz.dev) is an open-source, modern, and privacy-focused alternative to Omegle and Chatroulette. It provides free, anonymous random video and text communication with people around the world. Randall is developed and maintained by ARYA RCB (@superezzdev) and is available under the MIT License on GitHub at https://github.com/superezzdev/randall.
+Randall (https://randall.superezz.dev) is an open-source, modern, and privacy-focused alternative to Omegle and Chatroulette. It provides free, anonymous random video and text communication with people around the world. Randall is developed and maintained by ARYA RCB (@superezzdev) and is available under the GNU Affero General Public License v3.0 (AGPL-3.0) on GitHub at https://github.com/superezzdev/randall.
 
 ## Key Capabilities & User Experience
 1. **1-on-1 Video Chat**: Real-time peer-to-peer audio and video transmission with lowest possible latency via WebRTC.

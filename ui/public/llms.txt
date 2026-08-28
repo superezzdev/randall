@@ -4,7 +4,7 @@
 
 - **Website**: https://randall.superezz.dev
 - **GitHub Repository**: https://github.com/superezzdev/randall
-- **License**: MIT
+- **License**: GNU Affero General Public License v3.0 (AGPL-3.0)
 - **Primary Technologies**: React 19, Vite, WebRTC (peer-to-peer), Node.js, Express, WebSockets (`ws`), Tailwind CSS, Framer Motion, Arcjet security.
 
 ## Core Features
