@@ -1,16 +1,31 @@
-# React + Vite
+# Randall UI 🎥
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The frontend web application for **Randall**, built with React 19, Vite, Tailwind CSS, Motion, and Lucide Icons.
 
-Currently, two official plugins are available:
+## 🚀 Getting Started
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+### Install Dependencies
+```bash
+npm install
+```
 
-## React Compiler
+### Run Development Server
+```bash
+npm run dev
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Build for Production
+```bash
+npm run build
+```
 
-## Expanding the Oxlint configuration
+### Lint Code
+```bash
+npm run lint
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## 📂 Architecture
+
+- **`src/components/`**: React UI components including `VideoChat.jsx`, `Home.jsx`, controls, and overlays.
+- **`src/hooks/`**: WebRTC P2P signaling (`useVideoChat.js`), draggable viewport (`useDraggable.js`), and mobile visual viewport handling.
+- **`src/pages/`**: Static pages (`About.jsx`, `Privacy.jsx`, `Terms.jsx`, `Safety.jsx`, `Contact.jsx`).
