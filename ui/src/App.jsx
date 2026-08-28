@@ -17,22 +17,38 @@ function App() {
   useEffect(() => {
     if (isChatting) return;
 
-    const wsUrl = import.meta.env.VITE_WS_URL || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
-    const ws = new WebSocket(wsUrl);
+    let ws;
+    try {
+      const wsUrl = import.meta.env.VITE_WS_URL || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+      ws = new WebSocket(wsUrl);
 
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'userCount') {
-          setOnlineCount(data.count);
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'userCount' && typeof data.count === 'number') {
+            setOnlineCount(data.count);
+          }
+        } catch {
+          // ignore malformed message
         }
-      } catch (e) {
-        console.error("Error parsing websocket message", e);
-      }
-    };
+      };
+
+      ws.onerror = () => {
+        // Prevent uncaught errors on landing page when backend is cold-starting
+      };
+    } catch {
+      // ignore connection initialization errors
+    }
 
     return () => {
-      ws.close();
+      if (ws) {
+        ws.onmessage = null;
+        ws.onerror = null;
+        ws.onclose = null;
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          ws.close();
+        }
+      }
     };
   }, [isChatting]);
 
